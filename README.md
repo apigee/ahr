@@ -9,7 +9,7 @@ The AHR utility complements officially provided apigeectl utility and encapsulat
 
 
 > ### Please, go to ahr wiki
-> ### https://github.com/yuriylesyuk/ahr/wiki, 
+> ### https://github.com/apigee/ahr/wiki
 > ### for how-to-start guide and additional materials.
 
 
