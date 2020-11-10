@@ -1,0 +1,558 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+. $BASEDIR/ahr-lib.sh
+
+
+
+
+##### CLUSTER CLUSTER_ZONE CLUSTER_LOCATIONS PROJECT ORG MACHINE_TYPE"
+
+function show_help(){
+
+    echo "Set of operations to control Hybrid runtime deployment."
+    echo ""
+    echo " ahr-runtime-ctl get|home|template|apigeectl|delete|setsync|setproperty|org-validate-name|org-create|org-config|env-create|env-group-create|env-group-assign"
+    echo ""
+    echo "Examples:"
+    echo "    ahr-runtime-ctl template \$AHR_HOME/templates/overrides-large-template.yaml"
+    echo ""
+    echo "    ahr-runtime-ctl install-profile <project> <profile-name>"
+    echo ""
+    echo "    ahr-runtime-ctl apigeectl <apigeectl-command-line-arguments>"
+    echo ""
+    echo "    ahr-runtime-ctl apigeectl wait-for-ready <other-arguments-like-f-and-c>."
+    echo ""
+    echo "    ahr-runtime-ctl setsync <sa-email or \"\" to reset>"
+    echo "    ahr-runtime-ctl setproperty <property> <value>"
+    echo ""
+    echo "    ahr-runtime-ctl org-config"
+    echo "    ahr-runtime-ctl org-validate-name <org-name>"
+    echo "    ahr-runtime-ctl org-create <org-name> --ax-region <ax-region>"
+    echo "         ax-region: asia-east1 asia-northeast1 asia-southeast1"
+    echo "                    australia-southeast1 europe-west1 europe-west2"
+    echo "                    us-central1 us-east1 us-east4 us-west1"
+    echo ""
+    echo "    ahr-runtime-ctl env-create <env-name>"
+    echo "    ahr-runtime-ctl env-group-create <env-group-name> <runtime-host-alias>"
+    echo "    ahr-runtime-ctl env-group-config <env-group-name>"
+    echo "    ahr-runtime-ctl env-group-assign <org-name> <env-group-name> <env-name>"
+    echo ""
+}
+
+
+
+function set_sync(){
+    local synchronizer_sa_id=$1
+
+    local identity=""
+    if [ ! -z "$synchronizer_sa_id" ]; then
+        identity="\"serviceAccount:$synchronizer_sa_id\""
+    fi
+
+    curl -X POST -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" "https://apigee.googleapis.com/v1/organizations/$ORG:setSyncAuthorization" --data-binary @- <<EOF
+{
+    "identities": [ $identity ]
+}
+EOF
+
+}
+
+
+function validate_org_name(){
+    local org_name=$1
+
+    if [[ ! "${org_name}" =~ ^([a-z]{1})([a-z0-9-]*)$ ]]; then
+       echo "The organization ID: '$org_name' can contain only lower- case letters, digits, and hyphens."
+
+    elif [ ${#org_name} -gt 32   ]; then
+       echo "The organization ID: '$org_name' has a maximum length of 32 characters."
+
+    else
+
+       echo "The organization ID: '$org_name' is valid"
+    fi
+}
+
+
+# put items of the comman separeted list into double quotes
+function quotes() {
+    echo "$1" | awk 'BEGIN{FS=",";OFS=","}{for(i=1;i<=NF;i++) $i="\""$i"\""; print}'
+}
+
+ACTION="$1"
+
+#-----------------------------------------------------------------------
+if [ "get" == "$ACTION" ]; then
+
+check_envvars "HYBRID_HOME HYBRID_VERSION HYBRID_TARBALL RUNTIME_CONFIG"
+
+
+
+
+mkdir -p $HYBRID_HOME
+cd $HYBRID_HOME
+
+
+curl --silent -LO https://storage.googleapis.com/apigee-public/apigee-hybrid-setup/$HYBRID_VERSION/$HYBRID_TARBALL
+
+tar xvzf $HYBRID_TARBALL > /dev/null
+
+# define APIGEECTL_HOME
+export APIGEECTL_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$HYBRID_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
+
+export PATH=$APIGEECTL_HOME:$PATH
+
+echo "# To define APIGEECTL_HOME in your shell, execute:"
+echo "export APIGEECTL_HOME=$APIGEECTL_HOME"
+echo "export PATH=\$APIGEECTL_HOME:\$PATH"
+echo ""
+echo "# or"
+echo "source <(ahr-runtime-ctl home)"
+
+
+#-----------------------------------------------------------------------
+elif [ "apigeectl" == "$ACTION" ]; then
+
+check_envvars "APIGEECTL_HOME"
+
+
+## apigeectl wrapper
+
+#
+# 
+# wraps the fact that apigeectl needs to be executed in $APIGEECTL_HOME
+# adds wait-for-ready operation
+#
+
+cd $APIGEECTL_HOME
+
+if [[ " ${@} " =~ " wait-for-ready " ]]; then
+
+    bash <<T
+cntr=1
+while true; do 
+    exit_code=\$(${@/wait-for-ready/check-ready}; echo \$?)
+    if [ \$exit_code -ne 0 ]; then
+        echo -n "."
+        sleep 5
+        echo $(( cntr % 12 ))
+        cntr=$(( cntr+1 ))
+    else
+        break
+    fi
+done
+T
+
+else 
+#    exit_code=
+${@}
+#; echo $?)
+#    exit $exit_code
+fi 
+
+
+
+#-----------------------------------------------------------------------
+
+# TODO: setproperty smart[not override
+# TODO: move to org enable?????
+
+elif [ "setproperty" == "$ACTION" ]; then
+
+check_envvars "ORG"
+
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: Missing property or value."
+        echo ""
+        show_help
+        exit 5
+    fi
+
+    PROPERTY=$2
+    VALUE=$3
+
+
+    ORG_PROPERTIES=$( curl --silent -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $(token)" https://apigee.googleapis.com/v1/organizations/$ORG )
+echo "---"
+echo $ORG_PROPERTIES
+echo "---"
+    ORG_PROPERTIES=$( echo $ORG_PROPERTIES | jq ".properties.property |= (map(.name) | index(\"$PROPERTY\") ) as \$ix | if \$ix then .[\$ix][\"value\"]=\"$VALUE\" else . + [{name: \"$PROPERTY\", value:\"$VALUE\"}] end" )
+echo $ORG_PROPERTIES
+echo "---"
+
+    curl --silent -X PUT -H "Content-Type: application/json" -H "Authorization: Bearer $(token)" https://apigee.googleapis.com/v1/organizations/$ORG --data-binary @- <<EOF
+$ORG_PROPERTIES
+EOF
+
+
+#-----------------------------------------------------------------------
+elif [ "home" == "$ACTION" ]; then
+
+
+check_envvars "HYBRID_HOME HYBRID_TARBALL CONTEXT"
+
+    export APIGEECTL_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$HYBRID_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
+
+    echo "# To define APIGEECTL_HOME in your shell, execute:"
+    echo "#   source <(ahr-runtime-ctl home)"
+
+    echo "export APIGEECTL_HOME=$APIGEECTL_HOME"
+    echo "export PATH=\$APIGEECTL_HOME:\$PATH"
+
+    echo "# set current context and default namespace to apigee"
+    echo "kubectl config use-context \$CONTEXT"
+    echo "kubectl config set-context --current --namespace=apigee"
+
+#-----------------------------------------------------------------------
+elif [ "template" == "$ACTION" ]; then
+
+    TEMPLATE=$2
+    if [ "$TEMPLATE" = "" ]; then
+        echo "ERROR: Missing template file reference."
+        echo ""
+
+        show_help
+        exit 5
+    fi
+
+    TEMPLATE_VARS=$(envsubst --variables  "$(cat $TEMPLATE)"|sort -u)
+
+    check_envvars "$TEMPLATE_VARS"
+
+    envsubst < $TEMPLATE
+
+#-----------------------------------------------------------------------
+elif [ "setsync" == "$ACTION" ]; then
+
+    if [ "$#" -lt 2 ]; then
+        echo "ERROR: Missing synchronizer SA ID in the form of the email."
+        echo ""
+        show_help
+        exit 5
+    fi
+    synchronizer_sa_id="$2"
+
+    check_envvars "ORG"
+
+    set_sync "$synchronizer_sa_id"
+
+#-----------------------------------------------------------------------
+elif [ "delete" == "$ACTION" ]; then
+
+   echo -e "Deleting hybrid install...."
+
+    apigeectl delete -f $RUNTIME_CONFIG --all
+
+#-----------------------------------------------------------------------
+elif [ "org-config" == "$ACTION" ]; then
+
+    check_envvars "ORG"
+
+echo "Hybrid Organization $ORG  properties:"
+curl -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" "https://apigee.googleapis.com/v1/organizations/$ORG"
+
+
+echo "Sync Authorization:"
+curl -X POST -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" "https://apigee.googleapis.com/v1/organizations/$ORG:getSyncAuthorization"
+
+#-----------------------------------------------------------------------
+elif [ "org-validate-name" == "$ACTION" ]; then
+
+     validate_org_name $2
+
+#-----------------------------------------------------------------------
+elif [ "org-create" == "$ACTION" ]; then
+    if [ "$#" -lt 2 ]; then
+        echo "ERROR: No org name is provided."
+        echo ""
+        show_help
+        exit 5
+    fi
+
+    ## TODO: ahr-runtime-ctl org-create hybrid-org --ax-region europe-west1
+    ## TODO: process org parameter as the one after org-create
+    ## TODO: move AX_REGION from positional to --option
+    ORG=$2
+    AX_REGION=$4
+
+check_envvars "PROJECT"
+check_commands "jq"
+
+curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations?parent=projects/$PROJECT --data-binary @- <<EOF
+{
+    "name":"$ORG",
+    "displayName":"$ORG",
+    "description":"organization_description",
+    "runtimeType":"HYBRID",
+    "analyticsRegion":"$AX_REGION"
+}
+EOF
+
+# make it a synchronous call
+wait_for_ready "\"$ORG\"" 'curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG | jq ".name"' "Organization $ORG is created." 
+
+#-----------------------------------------------------------------------
+elif [ "env-create" == "$ACTION" ]; then
+    if [ "$#" -lt 2 ]; then
+        echo "ERROR: No environment name is provided."
+        echo ""
+        show_help
+        exit 5
+    fi
+
+    ENV=$2
+
+check_envvars "ORG"
+curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments --data-binary @- <<EOT
+{
+  "name": "$ENV",
+  "description": "$ENV environment",
+  "displayName": "$ENV"
+}
+EOT
+
+# make it a synchronous call
+wait_for_ready "\"$ENV\"" 'curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV | jq ".name"' "Environment $ENV of Organization $ORG is created."
+
+
+#-----------------------------------------------------------------------
+elif [ "env-group-create" == "$ACTION" ]; then
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: No environment group name or DNS name is provided."
+        echo ""
+        echo "    ahr-runtime-ctl env-group-create <env-group-name> <runtime-host-alias>"
+        show_help
+        exit 5
+    fi
+    ENV_GROUP=$2
+    HOSTNAMES=$(quotes "$3" )
+
+check_envvars "ORG"
+
+curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups --data-binary @- <<EOT
+{
+  "name": "$ENV_GROUP",
+  "hostnames": [ $HOSTNAMES ]
+}
+EOT
+
+#-----------------------------------------------------------------------
+elif [ "env-group-config" == "$ACTION" ]; then
+    if [ "$#" -lt 2 ]; then
+        echo "ERROR: No environment group name or DNS name is provided."
+        echo ""
+        echo "    ahr-runtime-ctl env-group-config <env-group-name> <runtime-host-alias>"
+        show_help
+        exit 5
+    fi
+    ENV_GROUP=$2
+
+check_envvars "ORG"
+
+curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP
+
+#-----------------------------------------------------------------------
+elif [ "env-group-set-hostnames" == "$ACTION" ]; then
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: No environment group name or hostname(s) is provided."
+        echo ""
+        echo "    ahr-runtime-ctl env-group-config <env-group-name> <runtime-host-alias(es)-comma-separated>"
+        show_help
+        exit 5
+    fi
+    ENV_GROUP=$2
+    HOSTNAMES=$(quotes "$3" )
+
+check_envvars "ORG"
+
+
+curl -X PATCH -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP --data-binary @- <<EOT
+{
+  "name": "$ENV_GROUP",
+  "hostnames": [ $HOSTNAMES ]
+}
+EOT
+
+#-----------------------------------------------------------------------
+elif [ "env-group-assign" == "$ACTION" ]; then
+    if [ "$#" -lt 4 ]; then
+        echo "ERROR: No organization name or environment group name or environment name is provided."
+        echo ""
+        echo "    ahr-runtime-ctl env-group-assign <org-name> <env-group-name> <env-name>"
+        show_help
+        exit 5
+    fi
+    ORG=$2
+    ENV_GROUP=$3
+    ENV=$4
+
+check_envvars "ORG"
+
+curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP/attachments --data-binary @- <<EOT
+{
+  "environment": "$ENV"
+}
+EOT
+
+
+#-----------------------------------------------------------------------
+elif [ "install-profile" == "$ACTION" ]; then
+    if [ "$#" -lt 4 ]; then
+        echo "ERROR: Either project or hybrid profile or asm profile are not provided."
+        echo ""
+        echo "    ahr-runtime-ctl install-profile <project> <hybrid-profile> <asm-profile>"
+        echo ""
+        echo "Example:"
+        echo "    ahr-runtime-ctl install-profile \$GOOGLE_CLOUD_PROJECT small asm-gcp"
+        echo ""
+        echo "Supported hybrid profiles: small"
+        echo "Supported asm profiles: asm-gcp asm-multicloud"
+        echo ""
+        echo "Override if you wish (ie, set up before calling the operation):"
+        echo "    HYBRID_HOME HYBRID_ENV"
+        echo "    REGION ZONE AX_REGION"
+        echo "    MACHINE_TYPE_DATA MACHINE_TYPE_RUNTIME"
+        exit 5
+    fi
+    PROJECT=$2
+    HYBRID_PROFILE=$3
+    ASM_PROFILE=$4
+
+    check_envvars "AHR_HOME HYBRID_PROFILE ASM_PROFILE"
+
+# 
+# profile: small
+# 
+
+export PROJECT
+
+## Hybrid Install Environment
+
+export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
+export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-130.env}
+
+
+mkdir -p $HYBRID_HOME
+
+cp $AHR_HOME/examples/hybrid-sz-s-1.3.sh $HYBRID_ENV
+
+
+echo "Using Project: $PROJECT"
+
+gcloud config set project $PROJECT
+
+source <(grep 'export REGION=' $HYBRID_ENV)
+
+ahr-verify-ctl api-enable
+
+# Provision Load Balancer
+set +e
+gcloud compute addresses create runtime-ip --region $REGION
+set -e
+
+export RUNTIME_IP=$(az network public-ip show --resource-group $RESOURCE_GROUP --name $CLUSTER-public-ip --query ipAddress --output tsv)
+sed -i -E "s/^(export RUNTIME_IP=).*/\1$RUNTIME_IP/g" $HYBRID_ENV
+
+
+source $HYBRID_ENV
+
+echo "ASM version: $ASM_VERSION"
+
+# Create GKE cluster
+ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
+
+set +e
+ahr-cluster-ctl create
+set -e
+
+# Install Certificate Manager
+echo "Cert Manager version: $CERT_MANAGER_MANIFEST"
+kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST > /dev/null
+
+
+# Install ASM
+ahr-cluster-ctl asm-get $ASM_VERSION
+
+export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
+export PATH=$ASM_HOME/bin:$PATH
+
+# Use supplied istio-operator.yaml 
+export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT} --format="value(projectNumber)")
+export ref=\$ref
+export ASM_RELEASE=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
+
+ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_RELEASE-$ASM_PROFILE.yaml > $ASM_CONFIG
+
+if [ "$ASM_RELEASE" = "1.5" ]; then
+
+    istioctl manifest apply -f $ASM_CONFIG
+
+else # 1.6
+
+    export WORKLOAD_POOL=${PROJECT}.svc.id.goog
+
+    gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
+
+    curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data ''
+
+    istioctl install -f $ASM_CONFIG
+fi
+
+
+
+# Install Hybrid runtime
+ahr-runtime-ctl get
+
+export APIGEECTL_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$HYBRID_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
+export PATH=$APIGEECTL_HOME:$PATH
+
+source $AHR_HOME/bin/ahr-lib.sh
+ahr-runtime-ctl org-validate-name $ORG
+ahr-runtime-ctl org-create $ORG --ax-region $AX_REGION
+ahr-runtime-ctl env-create $ENV
+ahr-runtime-ctl env-group-create $ENV_GROUP $RUNTIME_HOST_ALIAS
+ahr-runtime-ctl env-group-assign $ORG $ENV_GROUP $ENV
+
+ahr-sa-ctl create-sa all
+ahr-sa-ctl create-key all
+
+ahr-runtime-ctl setsync $SYNCHRONIZER_SA_ID
+
+ahr-verify-ctl cert-create-ssc $RUNTIME_SSL_CERT $RUNTIME_SSL_KEY $RUNTIME_HOST_ALIAS
+
+gcloud projects add-iam-policy-binding $PROJECT --member $(get_account_as_member) --role roles/apigee.admin
+
+ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-130-template.yaml > $RUNTIME_CONFIG
+
+ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
+ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+
+ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+
+
+#-----------------------------------------------------------------------
+else
+    echo "Action unknown: $ACTION"
+    echo ""
+    show_help
+    exit 2
+fi
+#-----------------------------------------------------------------------

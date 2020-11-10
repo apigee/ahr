@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+. $BASEDIR/ahr-lib.sh
+
+
+
+##### CLUSTER CLUSTER_ZONE CLUSTER_LOCATIONS PROJECT ORG MACHINE_TYPE"
+
+function show_help(){
+
+    echo "Set of operations to control Hybrid runtime Cassandra ring."
+    echo ""
+    echo " ahr-cs-ctl keyspaces-list keyspaces-expand nodetool"
+    echo ""
+    echo "Examples:"
+    echo "    ahr-cs-ctl keyspaces-list"
+    echo "    ahr-cs-ctl keyspaces-expand"
+    echo ""
+    echo "    ahr-cs-ctl nodetool <nodetool-command>"
+    echo ""
+    echo ""
+}
+
+
+
+check_envvars "APIGEECTL_HOME"
+ACTION="$1"
+
+function get_secret_data_by_jsonpath(){
+    local secret=$1
+    local jsonpath=$2
+
+    echo $(kubectl get secret $secret -o jsonpath="$jsonpath"|base64 -d)
+}
+
+# execute CQL command
+function cqlsh_exec(){
+    local cql=$1
+
+    local CASS_USERNAME=$( get_secret_data_by_jsonpath "apigee-cps-ddl" "{.data.user}" )
+    local CASS_PASSWORD=$( get_secret_data_by_jsonpath "apigee-cps-ddl" "{.data.password}" )
+
+    kubectl exec apigee-cassandra-0 -- sh -c "export SSL_CERTFILE=/opt/apigee/ssl/ca.crt; cqlsh apigee-cassandra-0.apigee-cassandra.apigee.svc.cluster.local -u $CASS_USERNAME -p $CASS_PASSWORD --ssl  -e \"$cql\""
+}
+
+function get_replication_list(){
+    # 'dc-1':3, 'dc-2':3
+    local repl_list=""
+    local sep=""
+    for dc in $(kubectl exec apigee-cassandra-0 -- nodetool status |grep "Datacenter:" |awk '{print $2}'); do
+        repl_list=${repl_list}${sep}\'${dc}\':3
+        sep=","
+    done
+    echo "$repl_list"
+}
+
+if [ "nodetool" == "$ACTION" ]; then
+
+    CASSANDRA_POD=apigee-cassandra-0
+
+    args=("$@")
+    for ((i=0; i<"${#args[@]}"; ++i)); do
+        case ${args[i]} in
+            --pod) CASSANDRA_POD=${args[i+1]};  unset args[i]; unset args[i+1]; break;;
+        esac
+    done
+    
+    kubectl exec ${CASSANDRA_POD} -- ${args[@]}
+
+elif [ "keyspaces-list" == "$ACTION" ]; then
+
+    cqlsh_exec "select * from system_schema.keyspaces;"
+
+elif [ "keyspaces-expand" == "$ACTION" ]; then
+
+check_envvars "ORG"
+
+    ORG_TOKEN=$(echo "$ORG" |awk '{gsub(/-/, "_");print $0}')
+
+    # '
+    KEYSPACES="cache_${ORG_TOKEN}_hybrid kms_${ORG_TOKEN}_hybrid kvm_${ORG_TOKEN}_hybrid quota_${ORG_TOKEN}_hybrid perses"
+
+    REPLICATION_LIST=$( get_replication_list )
+
+
+    # ALTER KEYSPACE kms_hybrid_test_7_hybrid WITH replication = {'class': 'NetworkTopologyStrategy', 'dc-1':3, 'dc-2':3};
+    for ks in $KEYSPACES; do
+      
+      CQL="ALTER KEYSPACE $ks WITH replication = {'class': 'NetworkTopologyStrategy', $REPLICATION_LIST};"
+
+      echo "Executing: $CQL"
+###      cqlsh_exec "$CQL"
+    done
+
+else
+
+
+
+    echo "Action unknown: $ACTION"
+    echo ""
+    show_help
+    exit 2
+fi
+#-----------------------------------------------------------------------

@@ -1,0 +1,502 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ahsam apigee hybrid service account manager
+
+# Parameters:
+#    $1 ACTION create|delete|config
+#    $2 Role
+
+set -e
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+. $BASEDIR/ahr-lib.sh
+
+# check required variables
+check_envvars "PROJECT SA_DIR"
+
+
+# options
+pps=""
+while(($#)); do
+case "$1" in
+  -f|--force)
+    FORCE=Y
+    shift;;
+
+  -k|--force-key-file)
+    FORCE_KEY_FILE=Y
+
+    shift;;
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+
+
+#
+# Apigee Hybrid role and permissions layout
+#
+# https://cloud.google.com/iam/docs/understanding-roles#apigee-roles
+
+APIGEE_COMP_ALL="synchronizer,mart,udca,logger,metrics,watcher,cassandra"
+APIGEE_CONFIG_COMP_ALL="synchronizer,mart,udca"
+
+APIGEE_ASM_ROLES='roles/gkehub.connect'
+APIGEE_ASM_PERMS='"gkehub.endpoints.connect"'
+APIGEE_ASM_NAME='ASM Service Account'
+
+APIGEE_SYNCHRONIZER_ROLES='roles/apigee.synchronizerManager'
+APIGEE_SYNCHRONIZER_PERMS='"apigee.environments.get","apigee.environments.manageRuntime"'
+APIGEE_SYNCHRONIZER_NAME='Synchronizer Manager Service Account'
+
+APIGEE_MART_ROLES='roles/apigeeconnect.Agent'
+APIGEE_MART_PERMS='"apigeeconnect.endpoints.connect"'
+APIGEE_MART_NAME='MART Service Account'
+
+APIGEE_UDCA_ROLES='roles/apigee.analyticsAgent'
+APIGEE_UDCA_PERMS='"apigee.environments.getDataLocation"'
+APIGEE_UDCA_NAME='UDCA Service Account'
+
+APIGEE_LOGGER_ROLES='roles/logging.logWriter'
+APIGEE_LOGGER_PERMS='"logging.logEntries.create"'
+APIGEE_LOGGER_NAME='Logs Writer Service Account'
+
+APIGEE_METRICS_ROLES='roles/monitoring.metricWriter'
+APIGEE_METRICS_PERMS='"monitoring.metricDescriptors.create","monitoring.metricDescriptors.get","monitoring.metricDescriptors.list","monitoring.monitoredResourceDescriptors.get","monitoring.monitoredResourceDescriptors.list","monitoring.timeSeries.create"'
+APIGEE_METRICS_NAME='Metrics Writer Service Account'
+
+APIGEE_WATCHER_ROLES='roles/apigee.runtimeAgent'
+APIGEE_WATCHER_PERMS='"apigee.canaryevaluations.create","apigee.canaryevaluations.get","apigee.ingressconfigs.get","apigee.instances.reportStatus","apigee.operations.get","apigee.operations.list"'
+APIGEE_WATCHER_NAME='Apigee Runtime Agent Service Account'
+
+APIGEE_CASSANDRA_ROLES='roles/storage.objectAdmin'
+APIGEE_CASSANDRA_PERMS='"resourcemanager.projects.get","resourcemanager.projects.list","storage.objects.*"'
+APIGEE_CASSANDRA_NAME='Cassandra Backups Service Account'
+
+function show_help(){
+
+    echo "Generate or remove collection of Apigee Hybrid Service Account roles"
+    echo ""
+    echo " ahr-sa-ctl create|config|delete|rebind \$PROJECT_ID"
+    echo ""
+    echo " <comp> -- all or [comma-separated combination of] synchronizer,mart,udca,logger,metrics,cassandra"
+    echo ""
+    echo ""
+    echo " ahr-sa-ctl create-sa all|<comp> [--force]"
+    
+#    echo " ahr-sa-ctl create-sa <comp> <comp-id> [--force]"
+
+    echo " ahr-sa-ctl create-key all|<comp> [--force-key-file]"
+
+    echo " ahr-sa-ctl config all|udca|synchronizer|mart <sa-id>"
+    echo "    ahr-sa-ctl config udca apigee-udca1"
+    echo " ahr-sa-ctl validate-key <comp> <key-json-file>"
+    echo " ahr-sa-ctl delete all|synchronizer|udca|mart|logger|metrics|cassandra"
+    echo ""
+    echo "The key .json files will be generated in a current directory."
+    echo "Utility relies on your current credentials being active for gcloud."
+    echo ""
+}
+
+
+if [ "$#" -lt 1 ]; then
+
+    show_help
+    exit 5
+fi
+
+action=$1
+sa_id=$2
+sa_name=$3
+
+function get_sa_email() {
+    local PROJECT=$1
+    local SA_ID=$2
+
+    echo  "${SA_ID}@${PROJECT}.iam.gserviceaccount.com"
+}
+
+
+#  process role
+function create_sa() {
+    local PROJECT=$1
+    local COMP=$2
+
+    local SA_ID=$3
+    if [ "$SA_ID" = "" ]; then
+        SA_ID=apigee-$COMP
+    fi
+
+    local SA_NAME=$(get $COMP "_NAME")
+    local SA_ROLE=$(get $COMP "_ROLES")
+
+    local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
+
+    if [ "$(gcloud iam service-accounts list --format="value(name)" --filter="name:$SA_EMAIL" | wc -l)" -eq 1 ]; then
+
+        if [ "$FORCE" = "Y" ]; then
+            delete_sa "$PROJECT" "$SA_ID"
+            FORCE_KEY_FILE=Y
+        fi
+    fi
+set +e
+    gcloud iam service-accounts create ${SA_ID} --display-name "${SA_NAME}"
+
+    if [ "$SA_ROLE" != "" ]; then
+        gcloud projects add-iam-policy-binding ${PROJECT} --member serviceAccount:$SA_EMAIL --role ${SA_ROLE} > /dev/null
+    fi
+set -e
+}
+
+function create_key() {
+
+    local PROJECT=$1
+    local COMP=$2
+
+    local SA_ID=$3
+    if [ "$SA_ID" = "" ]; then
+        SA_ID=apigee-$COMP
+    fi
+
+    local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
+
+
+    local SA_KEY_JSON=${SA_DIR}/${PROJECT}-${SA_ID}.json
+
+    # generate key json; 
+    # check if present; 
+    # skip if exists if option is present
+    if [ ! -f "$SA_KEY_JSON" ] || [ "$FORCE_KEY_FILE" = "Y" ]; then
+        gcloud iam service-accounts keys create ${SA_KEY_JSON} --iam-account $SA_EMAIL
+    else
+        echo "JSON file exists: $SA_KEY_JSON. Skipping."
+    fi
+}
+
+
+function get(){
+    local comp=$1
+    local property=$2
+
+    local value=$(echo -n "apigee-${comp}${property}"|awk '{gsub(/-/, "_");print toupper($0)}')
+
+    echo "${!value}"
+}
+
+
+#"
+function config_sa() {
+    local PROJECT=$1
+    local COMP=$2
+    local SA_ID=$3
+
+    local SA_EMAIL=$4
+    local SA_KEY_JSON=$5
+
+
+    local SA_PERMISSIONS="$(get $COMP '_PERMS')"
+
+    echo "Service Account: $SA_EMAIL"
+
+    gcloud projects get-iam-policy $PROJECT --flatten="bindings[].members" --format='table(bindings.role)' --filter="bindings.members:$SA_EMAIL"
+
+    # sa token
+    local satoken=$(export GOOGLE_APPLICATION_CREDENTIALS=$SA_KEY_JSON; gcloud auth application-default print-access-token)
+
+    echo "GCP Project Permission:"
+    local response=$(curl --silent -X POST -H "Authorization: Bearer $satoken" -H "Content-Type:application/json" https://cloudresourcemanager.googleapis.com/v1/projects/$PROJECT:testIamPermissions --data-binary @- <<EOF
+{
+    "permissions":  [
+        $SA_PERMISSIONS
+    ]
+}
+EOF
+)
+echo $response
+if [ $( grep -c error <<< "$response" ) -ne 0  ]; then
+    exit 1
+fi
+
+    if [[ ! ";mart;metrics;" =~ ";$COMP;" ]]; then
+
+       echo "Apigee Hybrid Org/Env Permission:"
+       response=$(curl --silent -X POST -H "Authorization: Bearer $satoken" -H "Content-Type:application/json" https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV:testIamPermissions --data-binary @- <<EOF
+{
+    "permissions":  [
+        $SA_PERMISSIONS
+    ]
+}
+EOF
+)
+echo $response
+if [ $( grep -c error <<< "$response" ) -ne 0  ]; then
+    exit 1
+fi
+
+    fi
+
+}
+#"
+function config_sa_by_id(){
+    local PROJECT=$1
+    local COMP=$2
+
+    local SA_ID=$3
+    if [ "$SA_ID" = "" ]; then
+        SA_ID=apigee-$COMP
+    fi
+
+    local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
+    local SA_KEY_JSON=${SA_DIR}/${PROJECT}-${SA_ID}.json
+
+    config_sa "$PROJECT" "$COMP" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
+}
+
+
+
+#
+function config_sa_by_key(){
+    local PROJECT=$1
+
+    local COMP=$2
+
+    local SA_KEY_JSON=$3
+
+    local SA_EMAIL=$(cat $SA_KEY_JSON|jq --raw-output .client_email)
+
+    local SA_ID=${SA_EMAIL%@*}
+
+
+    config_sa "$PROJECT" "$COMP" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
+}
+
+
+
+
+#
+function rebind_sa(){
+    local PROJECT=$1
+    local COMP=$2
+    local SA_ID=$3
+
+    local SA_EMAIL="$(get_sa_email $PROJECT $SA_ID)"
+
+    local SA_ROLE=$(get $COMP "_ROLES")
+set +e
+    gcloud projects remove-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
+set -e
+    gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
+
+}
+
+
+function delete_sa() {
+    local PROJECT=$1
+    local COMP=$2
+    local SA_ID=$3
+
+    if [ "$SA_ID" = "" ]; then
+        SA_ID=apigee-$COMP
+    fi
+
+
+    local SA_EMAIL="$(get_sa_email $PROJECT $SA_ID)"
+
+    local SA_KEY_JSON=${SA_DIR}/${PROJECT}-${SA_ID}.json
+
+
+    # Check if exists. If exists, delete it
+    if [ "$(gcloud iam service-accounts list --format="value(name)" --filter="name:$SA_EMAIL" | wc -l)" -eq 1 ]; then
+# TODO: right now, it assumes one role 
+        local SA_ROLE=$(get $COMP "_ROLES")
+
+        set +e
+        gcloud projects remove-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
+        set -e
+
+        gcloud iam service-accounts delete $SA_EMAIL --quiet
+
+        rm -f $SA_KEY_JSON
+    fi
+
+}
+
+#'
+if [ "$action" = "create-sa" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+    COMP_ID=$3
+
+    if [ "$COMP" = "all" ]; then
+        COMP="$APIGEE_COMP_ALL"
+    fi
+
+    IFS=","
+    for c in $COMP; do
+        case "$COMP" in
+            *,*)
+                # treat comp id as suffix
+                SA_ID=apigee-${c}$COMP_ID
+                ;;
+            *)
+                # single component
+                SA_ID=$COMP_ID
+        esac
+
+        create_sa "${PROJECT}" "$c" "$SA_ID"
+    done
+
+
+#---
+elif [ "$action" = "create-key" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+    COMP_ID=$3
+
+    if [ "$COMP" = "all" ]; then
+        COMP="$APIGEE_COMP_ALL"
+    fi
+
+    IFS=","
+    for c in $COMP; do
+        case "$COMP" in
+            *,*)
+                # treat comp id as suffix
+                SA_ID=apigee-${c}$COMP_ID
+                ;;
+            *)
+                # single component
+                SA_ID=$COMP_ID
+        esac
+
+        create_key "${PROJECT}" "$c" "$SA_ID"
+    done
+
+
+#'----
+elif [ "$action" = "config" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+
+    SA_ID=$3
+    if [ "$SA_ID" = "" ]; then
+        SA_ID=apigee-$COMP
+    fi
+
+    if [ "$COMP" = "all" ]; then
+        COMP="$APIGEE_CONFIG_COMP_ALL"
+    fi
+
+    IFS=","
+    for c in $COMP; do
+       config_sa_by_id $PROJECT "$c" "$SA_ID"
+    done
+
+#---
+
+elif [ "$action" = "validate-key" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+    KEY=$3
+    if [ "$KEY" = "" ]; then
+       echo "Missing Key File: $KEY"
+       echo ""
+       show_help
+       exit 1
+    fi
+    if [ ! -f "$KEY" ]; then
+        echo "Key file doesn't exist: $KEY"
+        exit 1
+    fi
+
+    config_sa_by_key $PROJECT $COMP $KEY
+    set -e
+
+#'-------------------
+
+elif [ "$action" = "rebind" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+
+    SA_ID=$3
+
+    if [ "$COMP" = "all" ]; then
+        COMP="$APIGEE_CONFIG_COMP_ALL"
+    fi
+
+    IFS=","
+    for c in $COMP; do
+       rebind_sa $PROJECT "$c" "$SA_ID"
+    done
+
+#'---
+
+
+elif [ "$action" = "delete" ]; then
+    COMP=$2
+    if [ "$COMP" = "" ]; then
+       echo "Missing Component: "
+       echo ""
+       show_help
+       exit 1
+    fi
+
+    SA_ID=$3
+
+    if [ "$COMP" = "all" ]; then
+        COMP="$APIGEE_COMP_ALL"
+    fi
+
+    IFS=","
+    for c in $COMP; do
+       delete_sa $PROJECT "$c" "$SA_ID"
+    done
+
+# ----------------------------------------------------------------------
+else
+    echo "Unknown action: $action"
+    echo ""
+    show_help
+fi

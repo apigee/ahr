@@ -1,0 +1,292 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+. $BASEDIR/ahr-lib.sh
+
+
+function show_help(){
+
+    echo " Supported Actions:"
+    echo "    create context template delete enable asm-get"
+    echo ""
+    echo " examples: "
+    echo "    ahr-cluster-ctl template <template-file> > <config-file>"
+    echo ""
+}
+
+
+
+ACTION="$1"
+
+#'-----------------------------------------------------------------------
+if [ "create" == "$ACTION" ]; then
+
+
+check_envvars "CLUSTER CLUSTER_CONFIG CLUSTER_ZONE CONTEXT PROJECT"
+
+if [ ! -f "$CLUSTER_CONFIG" ]; then
+    echo "Cluster file doesn't exist: $CLUSTER_CONFIG"
+    exit 1
+fi
+
+
+echo "Cluster definition: $CLUSTER_CONFIG"
+
+
+response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" https://container.googleapis.com/v1beta1/projects/$PROJECT/zones/$CLUSTER_ZONE/clusters --data-binary @$CLUSTER_CONFIG)
+if [ $( grep -c error <<< "$response" ) -ne 0  ]; then
+    echo "$response"
+
+    exit 1
+fi
+
+
+# check operation status
+operation=$( jq .name <<< "$response" )
+
+while true; do 
+    status=$(gcloud container operations list --format="value(status)" --filter="name=$operation")
+    if [ "$status" == "RUNNING" ]; then
+        echo -n "."
+        sleep 3
+    else
+        break
+    fi
+done
+
+
+set +e
+
+# get cluster context for kubectl
+gcloud container clusters get-credentials $CLUSTER --zone $CLUSTER_ZONE
+
+# rename default cluster name to the required one
+GKE_CONTEXT=gke_${PROJECT}_${CLUSTER_ZONE}_${CLUSTER}
+kubectl config rename-context $GKE_CONTEXT $CONTEXT
+
+# set the cluster role binding
+kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user $(gcloud config get-value account)
+
+
+
+#'-----------------------------------------------------------------------
+elif [ "template" == "$ACTION" ]; then
+
+    TEMPLATE=$2
+    if [ "$TEMPLATE" = "" ]; then
+       echo "Missing Template file: "
+       echo ""
+       show_help
+       exit 1
+    fi
+
+
+    TEMPLATE_VARS=$(envsubst --variables  "$(cat $TEMPLATE)"|sort -u)
+
+    check_envvars "$TEMPLATE_VARS"
+
+    envsubst < $TEMPLATE
+
+
+#-----------------------------------------------------------------------
+elif [ "context" == "$ACTION" ]; then
+
+check_envvars "CONTEXT"
+
+kubectl config use-context $CONTEXT
+
+
+#-----------------------------------------------------------------------
+elif [ "delete" == "$ACTION" ]; then
+
+check_envvars "CLUSTER CLUSTER_ZONE"
+
+   echo -e "Deleting Cluster: $CLUSTER in Zone: $CLUSTER_ZONE."
+   response=$(gcloud -q container clusters delete $CLUSTER --region $CLUSTER_ZONE)
+
+
+
+#-----------------------------------------------------------------------
+elif [ "asm-get" == "$ACTION" ]; then
+
+    ASM_VERSION=$2
+    if [ "$ASM_VERSION" = "" ]; then
+       echo "Missing ASM Version Parameter. Ie:"
+       echo "  ahr-cluster-ctl asm-get \$ASM_VERSION"
+       echo ""
+       show_help
+       exit 1
+    fi
+
+
+check_envvars "HYBRID_HOME PLATFORM RUNTIME_CONFIG"
+
+mkdir -p $HYBRID_HOME
+cd $HYBRID_HOME
+
+# get asm code
+ASM_TARBALL="istio-$ASM_VERSION-$(get_platform_suffix $ASM_VERSION $PLATFORM)"
+ASM_TARBALL_URL="https://storage.googleapis.com/gke-release/asm/$ASM_TARBALL"
+
+echo "Getting asm tarball, version: $ASM_VERSION; url: $ASM_TARBALL_URL..."
+curl --silent -LO $ASM_TARBALL_URL
+
+tar xvzf $ASM_TARBALL > /dev/null
+
+# get asm resource config repo
+ASM_PACKAGE=anthos-service-mesh-packages
+ASM_PACKAGE_RELEASE=release-$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')-asm
+ASM_PACKAGE_URL=https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git
+
+echo "Getting resource configuration repo for $ASM_VERSION; release: $ASM_PACKAGE_RELEASE"
+rm -rf  $HYBRID_HOME/$ASM_PACKAGE
+git clone --single-branch --branch $ASM_PACKAGE_RELEASE https://github.com/GoogleCloudPlatform/$ASM_PACKAGE.git $HYBRID_HOME/$ASM_PACKAGE
+
+# define ASM_HOME
+export ASM_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$ASM_TARBALL | grep LICENSE | cut -d "/" -f 1)
+
+export PATH=$ASM_HOME:$PATH
+
+echo "# To define ASM_HOME in your shell, execute:"
+echo "export ASM_HOME=$ASM_HOME"
+echo "export PATH=\$ASM_HOME/bin:\$PATH"
+echo ""
+echo "# or TODO: [ ]"
+echo "source <(ahr-runtime-ctl home)"
+
+
+#'-----------------------------------------------------------------------
+elif [ "asm-template" == "$ACTION" ]; then
+
+    TEMPLATE=$2
+    if [ "$TEMPLATE" = "" ]; then
+       echo "Missing ASM IstioOperator Template file: "
+       echo ""
+       show_help
+       exit 1
+    fi
+
+
+    check_envvars "PROJECT AX_REGION CLUSTER"
+    check_commands "yq"
+
+
+function yq_update() {
+  local yq_yaml=$1
+  local yq_path=$2
+  local yq_value=$3
+
+  paths=$(yq r -pp <(echo -n "$yq_yaml") $yq_path)
+
+  for p in $paths; do
+
+    yq_yaml=$(yq w --style double <(echo -n "$yq_yaml") $p "$yq_value")
+  done
+
+
+ echo -n "$yq_yaml"
+}
+
+    CONFIG=$(cat $TEMPLATE)
+
+    export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT} --format="value(projectNumber)")
+
+CONFIG=$(yq_update "$CONFIG" 'metadata.clusterName' "$PROJECT/$REGION/$CLUSTER")
+
+
+CONFIG=$(yq_update "$CONFIG" '**.GCP_METADATA' "$PROJECT|$PROJECT_NUMBER|$CLUSTER|$AX_REGION")
+
+CONFIG=$(yq_update "$CONFIG" '**.TRUST_DOMAIN' "$PROJECT.svc.id.goog")
+
+CONFIG=$(yq_update "$CONFIG" '**.GKE_CLUSTER_URL' "https://container.googleapis.com/v1/projects/$PROJECT/locations/$REGION/clusters/$CLUSTER")
+
+
+CONFIG=$(yq_update "$CONFIG" 'spec.values.global.meshID' "$MESH_ID")
+CONFIG=$(yq_update "$CONFIG" 'spec.values.global.trustDomain' "$PROJECT.svc.id.goog")
+CONFIG=$(yq_update "$CONFIG" 'spec.values.global.sds.token.aud' "$PROJECT")
+
+
+
+CONFIG=`yq m <(echo -n "$CONFIG") - <<EOY
+spec:
+  meshConfig:
+    enableAutoMtls: false
+    accessLogFile: "/dev/stdout"
+    accessLogEncoding: 1
+    accessLogFormat: '{"start_time":"%START_TIME%","remote_address":"%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%","user_agent":"%REQ(USER-AGENT)%","host":"%REQ(:AUTHORITY)%","request":"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%","request_time":"%DURATION%","status":"%RESPONSE_CODE%","status_details":"%RESPONSE_CODE_DETAILS%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","upstream_address":"%UPSTREAM_HOST%","upstream_response_flags":"%RESPONSE_FLAGS%","upstream_response_time":"%RESPONSE_DURATION%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_cluster":"%UPSTREAM_CLUSTER%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%","request_method":"%REQ(:METHOD)%","request_path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","request_protocol":"%PROTOCOL%","tls_protocol":"%DOWNSTREAM_TLS_VERSION%","request_id":"%REQ(X-REQUEST-ID)%","sni_host":"%REQUESTED_SERVER_NAME%","apigee_dynamic_data":"%DYNAMIC_METADATA(envoy.lua)%"}'
+EOY`
+
+
+CONFIG=`yq m <(echo -n "$CONFIG") - <<EOY
+spec:
+  components:
+    pilot:
+      k8s:
+        hpaSpec:
+          maxReplicas: 3
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: true
+        k8s:
+          service:
+            type: LoadBalancer
+            loadBalancerIP: $RUNTIME_IP
+            ports:
+              - name: status-port
+                port: 15020
+                targetPort: 15020
+              - name: http2
+                port: 80
+                targetPort: 80
+              - name: https
+                port: 443
+              - name: prometheus
+                port: 15030
+                targetPort: 15030
+              - name: tcp
+                port: 31400
+                targetPort: 31400
+              - name: tls
+                port: 15443
+                targetPort: 15443
+          hpaSpec:
+            maxReplicas: 3
+EOY`
+
+echo "$CONFIG"
+
+
+#-----------------------------------------------------------------------
+elif [ "enable" == "$ACTION" ]; then
+
+check_envvars "PROJECT"
+
+
+   API=$2
+   echo -e "Enabling API $API in  $CLUSTER cluster: "
+   response=$(gcloud services enable $API --project $PROJECT)
+
+
+else
+    echo "Action unknown: $ACTION"
+    echo ""
+    show_help
+    exit 2
+fi
+#-----------------------------------------------------------------------

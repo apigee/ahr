@@ -1,0 +1,260 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+. $BASEDIR/ahr-lib.sh
+
+function show_help(){
+
+    echo "Set of operations to control Hybrid install and runtime configuration."
+    echo ""
+    echo " ahr-verify-ctl  cert-create-ssc cert-is-valid host-ip sa-key api-check api-enable  all"
+    echo ""
+    echo "   prereqs-install-yq"
+    echo ""
+    echo "Examples:"
+        echo "    ahr-verify-ctl cert-create-ssc <cert-file-pem> <key-file-pem> <host-name>"
+    echo "    ahr-verify-ctl cert-is-valid <cert-pem-file>"
+    echo ""
+}
+
+# APIs should be processed in max 20 batches
+
+REQUIRED_APIS1=" \
+    apigee.googleapis.com \
+    apigeeconnect.googleapis.com \
+    bigquery.googleapis.com \
+    bigquery.googleapis.com \
+    bigquerystorage.googleapis.com \
+    cloudapis.googleapis.com \
+    clouddebugger.googleapis.com \
+    cloudresourcemanager.googleapis.com \
+    cloudtrace.googleapis.com \
+    compute.googleapis.com \
+    computescanning.googleapis.com \
+    container.googleapis.com \
+    containeranalysis.googleapis.com \
+    containerregistry.googleapis.com \
+    datastore.googleapis.com \
+    dns.googleapis.com
+"
+REQUIRED_APIS2=" \
+    iam.googleapis.com \
+    iamcredentials.googleapis.com \
+    logging.googleapis.com \
+    monitoring.googleapis.com \
+    oslogin.googleapis.com \
+    pubsub.googleapis.com \
+    servicemanagement.googleapis.com \
+    serviceusage.googleapis.com \
+    sql-component.googleapis.com \
+    storage-api.googleapis.com \
+    storage-component.googleapis.com \
+    \
+    anthos.googleapis.com \
+    meshca.googleapis.com \
+    meshtelemetry.googleapis.com \
+    meshconfig.googleapis.com \
+    gkeconnect.googleapis.com \
+    gkehub.googleapis.com
+"
+
+# options
+STOPONERROR=1
+
+pps=""
+while(($#)); do
+case "$1" in
+  -s|--stoponerror)
+    STOPONERROR=0
+    shift;;
+
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+ACTION=$1
+
+
+function report_abend(){
+    local message=$*
+
+    echo $*
+    if [ $STOPONERROR = 1 ]; then
+        exit 1
+    fi
+}
+
+#-----------------------------------------------------------------------
+if [ "cert-create-ssc" == "$ACTION" ]; then
+    if [ "$#" -lt 4 ]; then
+        echo "ERROR: No Certificate destination file or Certificate key destination file or Host Name is provided."
+        echo ""
+        echo "    ahr-verify-ctl cert-create-ssc <cert-file-pem> <key-file-pem> <host-name>"
+        echo ""
+        show_help
+        exit 5
+    fi
+    SSL_CERT=$2
+    SSL_KEY=$3
+    HOST_NAME=$4
+
+echo "Saving certificate: $SSL_CERT"
+echo "           and key: $SSL_KEY"
+echo "          for FQDN: $HOST_NAME"
+echo ""
+openssl req -x509 -out $SSL_CERT -keyout $SSL_KEY -newkey rsa:2048 -nodes -sha256 -subj '/CN=api.exco.com' -extensions EXT -config <( printf "[dn]\nCN=$HOST_NAME\n[req]\ndistinguished_name=dn\n[EXT]\nbasicConstraints=critical,CA:TRUE,pathlen:1\nsubjectAltName=DNS:$HOST_NAME\nkeyUsage=digitalSignature,keyCertSign\nextendedKeyUsage=serverAuth")
+
+
+#-----------------------------------------------------------------------
+elif [ "cert-is-valid" == "$ACTION" ] || [ "all" == "$ACTION" ]; then
+
+    CERT_CHAIN=$2
+    if [ "$CERT_CHAIN" = "" ]; then
+       echo "Missing Certificate Chain file argument "
+       echo ""
+       echo "    ahr-verify-ctl cert-is-valid <cert-pem-file>"
+       echo ""
+       show_help
+       exit 1
+    fi
+
+echo "CHECK: certificate $CERT_CHAIN is valid today"
+
+if [ ! -f $CERT_CHAIN ]; then
+    report_abend "ABEND: File not found: $CERT_CHAIN"
+fi
+
+certNotAfter=$(openssl x509 -in $CERT_CHAIN -dates -noout | awk '/notAfter/{ printf( "%d%02d%02d",$4,(index( "|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|", substr($1,index($1,"=")+1))-2 )/4+1, $2 ) }')
+today=$(date +"%Y%m%d")
+if [[ "$today" > "$certNotAfter" ]]; then
+    report_abend "ABEND: Certicate Not After Date is less than today: Today: $today; Not After: $certNotAfter."
+fi
+
+
+
+#-----------------------------------------------------------------------
+elif [ "host-ip" == "$ACTION" ] || [ "all" == "$ACTION" ]; then
+
+
+echo "CHECK: Mart host alias resolves into mart ip"
+mart_ip=$(dig +short $MART_HOST_ALIAS)
+if [ "$mart_ip" != "$MART_IP" ]; then
+
+    report_abend "ABEND: Mart Host Alias does not resolve to the Mart IP. Host Alias: $MART_HOST_ALIAS; Dig: $mart_ip; IP: $MART_IP."
+fi
+
+echo "CHECK: Runtime host alias resolves into runtime ip"
+runtime_ip=$(dig +short $RUNTIME_HOST_ALIAS)
+if [ "$runtime_ip" != "$RUNTIME_IP" ]; then
+
+    report_abend echo "ABEND: Runtime Host Alias does not resolve to the Runtime IP. Host Alias: $RUNTIME_HOST_ALIAS; Dig: $runtime_ip; IP: $RUNTIME_IP."
+fi
+
+
+#-----------------------------------------------------------------------
+elif [ "sa-key" == "$ACTION" ]; then
+
+
+# sa keys
+
+function check_sa_key(){
+    comp=$1
+    json=$2 
+
+    echo -n "CHECK: $comp SA Key file is valid: "
+
+    output=$(ahr-sa-ctl key $comp $json)
+
+    exit_code=$?
+    if [ ! $exit_code = 0 ]; then
+        echo "no."
+        report_abend "ABEND: Problem with key $json for $comp component. Exit code: $exit_code. Output: $output"
+    else
+        echo "yes."
+    fi
+}
+
+check_sa_key mart $MART_SA
+
+check_sa_key udca $UDCA_SA
+
+check_sa_key synchronizer $SYNCHRONIZER_SA
+
+check_sa_key metrics $METRICS_SA
+
+
+
+
+#-----------------------------------------------------------------------
+elif [ "api-check" == "$ACTION" ]; then
+
+
+# prereqs: enabled apigee.googleapis.com
+
+
+
+
+function check_api_enabled() {
+    api=$1
+
+    status=$(gcloud services list --format="value(config.name)" --filter="config.name:$1 state=enabled"|wc -l)
+
+    echo $status
+}
+
+exit_flag=
+for api in $REQUIRED_APIS1 $REQUIRED_APIS2; do
+    echo -n "CHECK: $api API is enabled: "
+
+    if [ "$(check_api_enabled $api)" -eq 1 ]; then
+       echo "yes."
+    else
+       echo "no".
+       exit_flag=1
+    fi
+done
+
+if [ ! -z "$exit_flag" ]; then 
+    report_abend -e "\n\nABEND: Enable required APIs"
+fi
+
+#-----------------------------------------------------------------------
+elif [ "api-enable" == "$ACTION" ]; then
+
+    gcloud services enable $REQUIRED_APIS1
+    gcloud services enable $REQUIRED_APIS2
+
+#-----------------------------------------------------------------------
+elif [ "prereqs-install-yq" == "$ACTION" ]; then
+
+  mkdir -p ~/bin
+  curl -L https://github.com/mikefarah/yq/releases/download/3.3.2/yq_linux_amd64 -o ~/bin/yq
+  chmod +x ~/bin/yq
+
+  echo "# To add ~/bin folder, execute:"
+  echo "export PATH=~/bin:\$PATH"
+
+# ----------------------------------------------------------------------
+else
+    echo "Unknown action: $action"
+    echo ""
+    show_help
+fi
+#-----------------------------------------------------------------------

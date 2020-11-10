@@ -1,0 +1,59 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# This sample is ideal for a quick start. It uses the minimum recommended footprint to start apigee runtime components.
+# As much as possible, the overrides uses default settings and values. All the minimum replicas are set 1
+#
+
+# GCP project name where the org is provisioned.
+gcpProjectID: $PROJECT
+# Kubernetes cluster name.
+k8sClusterName: $CLUSTER
+# Apigee org name.
+org: $ORG
+
+envs:
+    # Apigee environment name.
+  - name: $ENV
+    # Domain name to which api traffic is sent.
+    hostAlias: "$RUNTIME_HOST_ALIAS"
+    # Certificate for the domain name; this can be self signed.
+    sslCertPath: $RUNTIME_SSL_CERT
+    # Private key for the domain name; this can be self signed.
+    sslKeyPath: $RUNTIME_SSL_KEY
+    # Service accounts for sync and UDCA.
+    serviceAccountPaths:
+      synchronizer: $SYNCHRONIZER_SA
+      udca: $UDCA_SA
+
+mart:
+  hostAlias: "$MART_HOST_ALIAS"
+  serviceAccountPath: $MART_SA
+  sslCertPath: $MART_SSL_CERT
+  sslKeyPath: $MART_SSL_KEY
+
+connectAgent:
+  enabled: true
+  serviceAccountPath: $MART_SA
+
+metrics:
+  serviceAccountPath: $METRICS_SA
+
+ingress:
+  enableAccesslog: true
+  runtime:
+    loadBalancerIP: $RUNTIME_IP
+  mart:
+    loadBalancerIP: $MART_IP

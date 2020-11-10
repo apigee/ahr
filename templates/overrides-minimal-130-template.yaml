@@ -1,0 +1,96 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# apigee-minimal profile
+#
+
+gcp:
+  projectID: $PROJECT
+  region: "$AX_REGION"
+
+org: "$ORG"
+
+k8sCluster:
+  name: $CLUSTER
+  region: "$AX_REGION"
+
+instanceID: "$CLUSTER-$REGION"
+ 
+virtualhosts:
+  - name: $ENV_GROUP
+    sslCertPath: $RUNTIME_SSL_CERT
+    sslKeyPath: $RUNTIME_SSL_KEY
+ 
+envs:
+  - name: $ENV
+    serviceAccountPaths:
+      synchronizer: $SYNCHRONIZER_SA
+      udca: $UDCA_SA
+ 
+mart:
+  replicaCountMin: 1
+  replicaCountMax: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  serviceAccountPath: $MART_SA
+ 
+synchronizer:
+  replicaCountMin: 1
+  replicaCountMax: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+ 
+runtime:
+ replicaCountMin: 1
+ replicaCountMax: 1
+ resources:
+   requests:
+     cpu: 250m
+     memory: 256Mi
+ 
+udca:
+ replicaCountMin: 1
+ replicaCountMax: 1
+ resources:
+   requests:
+     cpu: 100m
+     memory: 256Mi
+
+ fluentd:
+   resources:
+     limits:
+       memory: 128Mi
+     requests:
+       cpu: 100m
+       memory: 128Mi
+
+connectAgent:
+  serviceAccountPath: $MART_SA
+
+metrics:
+  enabled: false
+  serviceAccountPath: $METRICS_SA
+
+watcher:
+  serviceAccountPath: $WATCHER_SA
+
+
+
+
+
