@@ -417,13 +417,14 @@ elif [ "install-profile" == "$ACTION" ]; then
     if [ "$#" -lt 4 ]; then
         echo "ERROR: Either project or hybrid profile or asm profile are not provided."
         echo ""
-        echo "    ahr-runtime-ctl install-profile <project> <hybrid-profile> <asm-profile>"
+        echo "    ahr-runtime-ctl install-profile <project> <hybrid-profile> <asm-profile> [-c <comp[,comp]>]"
         echo ""
         echo "Example:"
         echo "    ahr-runtime-ctl install-profile \$GOOGLE_CLOUD_PROJECT small asm-gcp"
         echo ""
         echo "Supported hybrid profiles: small"
         echo "Supported asm profiles: asm-gcp asm-multicloud"
+        echo "Supported comma-separated components: cluster cert-manager runtime-ip istio apigee-org runtime "
         echo ""
         echo "Override if you wish (ie, set up before calling the operation):"
         echo "    HYBRID_HOME HYBRID_ENV"
@@ -431,6 +432,38 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo "    MACHINE_TYPE_DATA MACHINE_TYPE_RUNTIME"
         exit 5
     fi
+
+
+pps=""
+
+#defaults
+
+#home for hybrid installation
+export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
+
+# install all componenets by default
+COMPS=";all;"
+
+# options
+while(($#)); do
+case "$1" in
+  -c|--component)
+    COMPS="$2"
+
+    # TODO: [ ] validate legitimate components are present
+
+    COMPS=";${COMPS//,/;};"
+
+    shift 2;;
+
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+
     PROJECT=$2
     HYBRID_PROFILE=$3
     ASM_PROFILE=$4
@@ -443,9 +476,14 @@ elif [ "install-profile" == "$ACTION" ]; then
 
 export PROJECT
 
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";all;" ]]; then
+
+echo "Pre-flight checks and settings: gcp project; enabling apis..."
+
+
 ## Hybrid Install Environment
 
-export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
 export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-130.env}
 
 
@@ -462,6 +500,14 @@ source <(grep 'export REGION=' $HYBRID_ENV)
 
 ahr-verify-ctl api-enable
 
+fi
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";runtime-ip;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+echo "Provision Static IP Address and Configuring \$RUNTIME_IP variable..."
+
+
 # Provision Load Balancer
 set +e
 gcloud compute addresses create runtime-ip --region $REGION
@@ -473,7 +519,14 @@ sed -i -E "s/^(export RUNTIME_IP=).*/\1$RUNTIME_IP/g" $HYBRID_ENV
 
 source $HYBRID_ENV
 
-echo "ASM version: $ASM_VERSION"
+fi
+
+
+
+#-----------------------------------------------------------------------
+if [ "$COMPS" =~ ";cluster;" ] || [ "$COMPS" =~ ";all;" ]; then
+
+echo "Creating GKE Cluster using configuration: $CLUSTER_CONFIG..."
 
 # Create GKE cluster
 ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
@@ -482,10 +535,22 @@ set +e
 ahr-cluster-ctl create
 set -e
 
-# Install Certificate Manager
-echo "Cert Manager version: $CERT_MANAGER_MANIFEST"
+fi
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";cert-manager;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+
+echo "Installing Certificate Manager version: $CERT_MANAGER_MANIFEST"
+
 kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST > /dev/null
 
+fi
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+echo "ASM version: $ASM_VERSION"
 
 # Install ASM
 ahr-cluster-ctl asm-get $ASM_VERSION
@@ -516,8 +581,13 @@ else # 1.6
 fi
 
 
+fi
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";apigee-org;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-# Install Hybrid runtime
+echo "Configuring Apigee Organization: $ORG, Environment: $ENV..."
+
+# Get Hybrid installation
 ahr-runtime-ctl get
 
 export APIGEECTL_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$HYBRID_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
@@ -537,7 +607,17 @@ ahr-runtime-ctl setsync $SYNCHRONIZER_SA_ID
 
 ahr-verify-ctl cert-create-ssc $RUNTIME_SSL_CERT $RUNTIME_SSL_KEY $RUNTIME_HOST_ALIAS
 
-gcloud projects add-iam-policy-binding $PROJECT --member $(get_account_as_member) --role roles/apigee.admin
+# required if identity running the script is not a project owner
+# gcloud projects add-iam-policy-binding $PROJECT --member $(get_account_as_member) --role roles/apigee.admin
+
+fi
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";runtime;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+echo "Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG..."
+
+# Install Hybrid runtime
 
 ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-130-template.yaml > $RUNTIME_CONFIG
 
@@ -546,6 +626,9 @@ ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+
+fi
+
 
 
 #-----------------------------------------------------------------------
