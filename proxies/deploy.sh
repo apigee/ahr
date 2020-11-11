@@ -46,3 +46,8 @@ while [ "$STATE" != "READY" ]; do
     sleep 5
 done
 echo -e "\nProxy $API is deployed.\n"
+echo '
+Sample request:
+  curl --cacert $RUNTIME_SSL_CERT https://$RUNTIME_HOST_ALIAS/ping -v --resolve "$RUNTIME_HOST_ALIAS:443:$RUNTIME_IP" --http1.1
+'
+
