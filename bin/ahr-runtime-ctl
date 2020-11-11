@@ -101,7 +101,7 @@ ACTION="$1"
 #-----------------------------------------------------------------------
 if [ "get" == "$ACTION" ]; then
 
-check_envvars "HYBRID_HOME HYBRID_VERSION HYBRID_TARBALL RUNTIME_CONFIG"
+    check_envvars "HYBRID_HOME HYBRID_VERSION HYBRID_TARBALL RUNTIME_CONFIG"
 
 
 
@@ -424,7 +424,7 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo ""
         echo "Supported hybrid profiles: small"
         echo "Supported asm profiles: asm-gcp asm-multicloud"
-        echo "Supported comma-separated components: cluster cert-manager runtime-ip istio apigee-org runtime "
+        echo "Supported comma-separated components: cluster cert-manager gcp-ip istio apigee-org runtime "
         echo ""
         echo "Override if you wish (ie, set up before calling the operation):"
         echo "    HYBRID_HOME HYBRID_ENV"
@@ -503,7 +503,7 @@ ahr-verify-ctl api-enable
 fi
 
 #-----------------------------------------------------------------------
-if [[ "$COMPS" =~ ";runtime-ip;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+if [[ "$COMPS" =~ ";gcp-ip;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
 echo "Provision Static IP Address and Configuring \$RUNTIME_IP variable..."
 
@@ -513,7 +513,8 @@ set +e
 gcloud compute addresses create runtime-ip --region $REGION
 set -e
 
-export RUNTIME_IP=$(az network public-ip show --resource-group $RESOURCE_GROUP --name $CLUSTER-public-ip --query ipAddress --output tsv)
+export RUNTIME_IP=$(gcloud compute addresses describe runtime-ip --region $REGION --format='value(address)')
+
 sed -i -E "s/^(export RUNTIME_IP=).*/\1$RUNTIME_IP/g" $HYBRID_ENV
 
 
@@ -524,7 +525,9 @@ fi
 
 
 #-----------------------------------------------------------------------
-if [ "$COMPS" =~ ";cluster;" ] || [ "$COMPS" =~ ";all;" ]; then
+if [[ "$COMPS" =~ ";cluster;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+    check_envvars "CLUSTER_CONFIG"
 
 echo "Creating GKE Cluster using configuration: $CLUSTER_CONFIG..."
 
@@ -540,6 +543,7 @@ fi
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";cert-manager;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
+    check_envvars "CERT_MANAGER_MANIFEST"
 
 echo "Installing Certificate Manager version: $CERT_MANAGER_MANIFEST"
 
@@ -549,6 +553,9 @@ fi
 
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+    check_envvars "PROJECT ASM_VERSION HYBRID_HOME"
+
 
 echo "ASM version: $ASM_VERSION"
 
@@ -619,7 +626,7 @@ echo "Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG..."
 
 # Install Hybrid runtime
 
-ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-130-template.yaml > $RUNTIME_CONFIG
+ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-13-template.yaml > $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
