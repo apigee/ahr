@@ -572,11 +572,16 @@ export ASM_RELEASE=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");pr
 
 ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_RELEASE-$ASM_PROFILE.yaml > $ASM_CONFIG
 
+
+# common
+# mesh_id cluster label
+ahr-cluster-ctl cluster-add-labels "mesh_id=proj-$PROJECT_NUMBER"
+
 if [ "$ASM_RELEASE" = "1.5" ]; then
 
     istioctl manifest apply -f $ASM_CONFIG
 
-else # 1.6
+else # >= 1.6
 
     export WORKLOAD_POOL=${PROJECT}.svc.id.goog
 

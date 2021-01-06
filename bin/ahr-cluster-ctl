@@ -23,7 +23,7 @@ BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 function show_help(){
 
     echo " Supported Actions:"
-    echo "    create context template delete enable asm-get"
+    echo "    create context template delete enable asm-get cluster-add-label"
     echo ""
     echo " examples: "
     echo "    ahr-cluster-ctl template <template-file> > <config-file>"
@@ -122,6 +122,21 @@ check_envvars "CLUSTER CLUSTER_ZONE"
 
 
 
+#-----------------------------------------------------------------------
+elif [ "cluster-add-labels" == "$ACTION" ]; then
+    ADD_LABELS=$2
+    if [ "$ADD_LABELS" = "" ]; then
+       echo "WARNING: No labels to add are provided."
+    else
+
+        check_envvars "CLUSTER CLUSTER_ZONE"
+
+
+        LABELS=$(gcloud container clusters describe $CLUSTER --zone=$CLUSTER_ZONE --format='value(resourceLabels)[delimiter=","]')
+
+        gcloud container clusters update $CLUSTER --zone=$CLUSTER_ZONE --update-labels="${LABELS:+$LABELS,}$ADD_LABELS"
+
+    fi
 #-----------------------------------------------------------------------
 elif [ "asm-get" == "$ACTION" ]; then
 
