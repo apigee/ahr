@@ -33,7 +33,13 @@ Script invocation:
 > curl -L https://raw.githubusercontent.com/apigee/ahr/main/bin/apigee-ngsaas-trial-install.sh | bash -
 > ```
 
+WARNING: A successful `Provisioning organization...` step takes 25-30 minutes to complete. According to the documentation: "This is a long running operation and could take anywhere from 10 minutes to 1 hour to complete." [->](https://cloud.google.com/sdk/gcloud/reference/alpha/apigee/organizations/provision)
+
+
 After the script runs, it displays LB IP, certificate location and generated `RUNTIME_HOST_ALIAS`, as well as a way to send a test request.
+
+When the script finishes, it takes extra 5-7 minutes to provision load balancers infrastructure. You can use following curl command to run it until 200 OK is returned to ensure that the ngSaas install is fully completed.
+
 
 Sample Output:
 ```
