@@ -103,6 +103,20 @@ function get_account_as_member() {
   echo "user:$ACCOUNT"
 }
 
+function get_hybrid_path_repo() {
+  # compare second version number
+  # before and after 1.4
+  local VERSION=$1
+
+  local REPO_PATH="apigee-release/hybrid"
+  local V_2ND_NMBR=$( echo "$VERSION" | awk -F. '{print $2}' )
+
+  if [ $V_2ND_NMBR -le 3 ]; then
+     REPO_PATH="apigee-public"
+
+  fi
+  echo -n "$REPO_PATH"
+}
 
 function get_platform_suffix() {
   local COMP=$1
@@ -138,3 +152,15 @@ function get_platform_suffix() {
   echo -n "$SUFFIX"
 }
 
+function get_apigeectl_tarball_url(){
+  if [ -z "$1" ]; then
+    echo -n "ERROR: no version provided"
+  elif [ -z "$2" ]; then
+    echo -n "ERROR: no PLATFORM provided"
+  else
+    local VERSION=$1
+    local PLATFORM=$2
+
+    echo -n "https://storage.googleapis.com/$(get_hybrid_path_repo $VERSION)/apigee-hybrid-setup/$VERSION/apigeectl_$(get_platform_suffix apigeectl $PLATFORM)"
+  fi
+}

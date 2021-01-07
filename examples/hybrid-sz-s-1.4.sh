@@ -31,15 +31,16 @@ export CERT_MANAGER_MANIFEST=https://github.com/jetstack/cert-manager/releases/d
 export ASM_PROFILE=${ASM_PROFILE:-asm-gcp}
 export ASM_VERSION=${ASM_VERSION:-1.7.3-asm.6}
 
-export ASM_TEMPLATE=$HYBRID_HOME/anthos-service-mesh-packages/asm/cluster/istio-operator.yaml
+export ASM_TEMPLATE=$HYBRID_HOME/anthos-service-mesh-packages/asm/istio/istio-operator.yaml
+
 export ASM_CONFIG=$HYBRID_HOME/istio-operator.yaml
 
 #
 # Hybrid release configuration
 #
 export HYBRID_VERSION=1.4.0
-export HYBRID_TARBALL=apigeectl_$(get_platform_suffix apigeectl $PLATFORM)
-
+export APIGEECTL_TARBALL_URL=$(get_apigeectl_tarball_url "$HYBRID_VERSION" "$PLATFORM")
+export APIGEECTL_TARBALL=apigeectl_$(get_platform_suffix apigeectl "$PLATFORM")
 
 
 
