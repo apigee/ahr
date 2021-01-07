@@ -38,8 +38,9 @@ gcloud services enable apigee.googleapis.com servicenetworking.googleapis.com co
 # Step 4: Configure service networking
 
 # 1. Define a range of reserved IP addresses for your network. Global
-
+set +e
 gcloud compute addresses create google-svcs --global --prefix-length=16 --description="Peering range for Google services" --network=default --purpose=VPC_PEERING --project=$PROJECT
+set -e
 
 # 2. Connect your project's network to the Service Networking API via VPC peering
 gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com --network=default --ranges=google-svcs --project=$PROJECT
