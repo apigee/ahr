@@ -25,17 +25,22 @@ export AX_REGION=europe-west1
 Script invocation:
 
 ```
-./apigee-ngsaas-trial-install.sh
+./bin/apigee-ngsaas-trial-install.sh
 ```
 
-After the script runs, it displays LB IP, certificate location and generated RUNTIME_HOST_ALIAS, as well as a way to send a test request.
+> NOTE: To invoke the script directly from the github repo, use
+> ```
+> curl -L https://raw.githubusercontent.com/apigee/ahr/main/bin/apigee-ngsaas-trial-install.sh | bash -
+> ```
+
+After the script runs, it displays LB IP, certificate location and generated `RUNTIME_HOST_ALIAS`, as well as a way to send a test request.
 
 Sample Output:
 ```
 export RUNTIME_IP=35.227.201.175
 
-export RUNTIME_SSL_CERT=~/mig-cert.pem                                                                                                                                  
-export RUNTIME_SSL_KEY=~/mig-key.pem                                                                                                                                    
+export RUNTIME_SSL_CERT=~/mig-cert.pem
+export RUNTIME_SSL_KEY=~/mig-key.pem
 export RUNTIME_HOST_ALIAS=$PROJECT-eval.apigee.net 
 
 curl --cacert $RUNTIME_SSL_CERT https://$RUNTIME_HOST_ALIAS/hello-world -v --resolve "$RUNTIME_HOST_ALIAS:443:$RUNTIME_IP"
@@ -47,8 +52,8 @@ The curl command above uses --resolve for ip address resolution and --cacert for
 
 To be able to execute requests transparantly at your development machine, you need:
 
-1. Add the RUNTIME_SSL_CERT certificate your machine truststore;
-2. Add the RUNTIME_IP with the RUNTIME_HOST_ALIAS to your machine's /etc/hosts file.
+1. Add the `RUNTIME_SSL_CERT` certificate your machine truststore;
+2. Add the `RUNTIME_IP` with the `RUNTIME_HOST_ALIAS` to your machine's `/etc/hosts` file.
 
 
 
