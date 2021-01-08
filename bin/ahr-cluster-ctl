@@ -159,7 +159,7 @@ cd $HYBRID_HOME
 ASM_TARBALL="istio-$ASM_VERSION-$(get_platform_suffix $ASM_VERSION $PLATFORM)"
 ASM_TARBALL_URL="https://storage.googleapis.com/gke-release/asm/$ASM_TARBALL"
 
-echo "Getting asm tarball, version: $ASM_VERSION; url: $ASM_TARBALL_URL..."
+echo "# Getting asm tarball, version: $ASM_VERSION; url: $ASM_TARBALL_URL..."
 curl --silent -LO $ASM_TARBALL_URL
 
 tar xvzf $ASM_TARBALL > /dev/null
@@ -169,9 +169,9 @@ ASM_PACKAGE=anthos-service-mesh-packages
 ASM_PACKAGE_RELEASE=release-$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')-asm
 ASM_PACKAGE_URL=https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git
 
-echo "Getting resource configuration repo for $ASM_VERSION; release: $ASM_PACKAGE_RELEASE"
+echo "# Getting resource configuration repo for $ASM_VERSION; release: $ASM_PACKAGE_RELEASE"
 rm -rf  $HYBRID_HOME/$ASM_PACKAGE
-git clone --single-branch --branch $ASM_PACKAGE_RELEASE https://github.com/GoogleCloudPlatform/$ASM_PACKAGE.git $HYBRID_HOME/$ASM_PACKAGE
+git clone --single-branch --branch $ASM_PACKAGE_RELEASE https://github.com/GoogleCloudPlatform/$ASM_PACKAGE.git $HYBRID_HOME/$ASM_PACKAGE 2> /dev/null
 
 # define ASM_HOME
 export ASM_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$ASM_TARBALL | grep LICENSE | cut -d "/" -f 1)
@@ -183,7 +183,7 @@ echo "export ASM_HOME=$ASM_HOME"
 echo "export PATH=\$ASM_HOME/bin:\$PATH"
 echo ""
 echo "# or TODO: [ ]"
-echo "source <(ahr-runtime-ctl home)"
+echo "#   source <(ahr-runtime-ctl home)"
 
 
 #'-----------------------------------------------------------------------

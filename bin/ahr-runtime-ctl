@@ -137,8 +137,11 @@ elif [ "get-apigeectl" == "$ACTION" ]; then
 mkdir -p $HYBRID_HOME
 cd $HYBRID_HOME
 
+echo "# Getting apigeectl tarball URL: $APIGEECTL_TARBALL_URL"
 
 curl --silent -LO $APIGEECTL_TARBALL_URL
+
+echo "# Untarring tarball: $APIGEECTL_TARBALL to $HYBRID_HOME"
 
 tar xvzf $APIGEECTL_TARBALL > /dev/null
 
@@ -152,8 +155,22 @@ echo "export APIGEECTL_HOME=$APIGEECTL_HOME"
 echo "export PATH=\$APIGEECTL_HOME:\$PATH"
 echo ""
 echo "# or"
-echo "source <(ahr-runtime-ctl home)"
+echo "# source <(ahr-runtime-ctl home)"
 
+
+#-----------------------------------------------------------------------
+elif [ "get-apigeectl-home" == "$ACTION" ]; then
+  GET_HOME_APIGEECTL_TARBALL=$2
+  if [ -z "$GET_HOME_APIGEECTL_TARBALL" ]; then
+     echo "ERROR: apigeectl tarball file is missing"
+     exit 8
+  fi
+
+  GET_HOME_ABS_DIR=$(cd "$(dirname "$GET_HOME_APIGEE_TARBALL")"; pwd)
+
+  GET_HOME_APIGEECTL_HOME=$(tar tf $GET_HOME_APIGEECTL_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
+
+  echo -n "$GET_HOME_ABS_DIR/$GET_HOME_APIGEECTL_HOME"
 
 #-----------------------------------------------------------------------
 elif [ "apigeectl" == "$ACTION" ]; then
@@ -512,12 +529,12 @@ echo "Pre-flight checks and settings: gcp project; enabling apis..."
 
 ## Hybrid Install Environment
 
-export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-130.env}
+export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-14.env}
 
 
 mkdir -p $HYBRID_HOME
 
-cp $AHR_HOME/examples/hybrid-sz-s-1.3.sh $HYBRID_ENV
+cp $AHR_HOME/examples/hybrid-sz-s-1.4.sh $HYBRID_ENV
 
 
 echo "Using Project: $PROJECT"
@@ -587,11 +604,9 @@ if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
 echo "ASM version: $ASM_VERSION"
 
-# Install ASM
-ahr-cluster-ctl asm-get $ASM_VERSION
+# Install ASM and add _HOME to PATH
+source <(ahr-cluster-ctl asm-get $ASM_VERSION)
 
-export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
-export PATH=$ASM_HOME/bin:$PATH
 
 # Use supplied istio-operator.yaml 
 export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT} --format="value(projectNumber)")
@@ -627,11 +642,9 @@ if [[ "$COMPS" =~ ";apigee-org;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
 echo "Configuring Apigee Organization: $ORG, Environment: $ENV..."
 
-# Get Hybrid installation
-ahr-runtime-ctl get
+# Get Hybrid installation and set up APIGEECTL_HOME in PATH
+source <(ahr-runtime-ctl get-apigeectl)
 
-export APIGEECTL_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$HYBRID_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
-export PATH=$APIGEECTL_HOME:$PATH
 
 source $AHR_HOME/bin/ahr-lib.sh
 ahr-runtime-ctl org-validate-name $ORG
