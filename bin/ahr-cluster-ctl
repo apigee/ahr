@@ -166,12 +166,12 @@ tar xvzf $ASM_TARBALL > /dev/null
 
 # get asm resource config repo
 ASM_PACKAGE=anthos-service-mesh-packages
-ASM_PACKAGE_RELEASE=release-$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')-asm
+ASM_PACKAGE_VERSION_MINOR=release-$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')-asm
 ASM_PACKAGE_URL=https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git
 
-echo "# Getting resource configuration repo for $ASM_VERSION; release: $ASM_PACKAGE_RELEASE"
+echo "# Getting resource configuration repo for $ASM_VERSION; release: $ASM_PACKAGE_VERSION_MINOR"
 rm -rf  $HYBRID_HOME/$ASM_PACKAGE
-git clone --single-branch --branch $ASM_PACKAGE_RELEASE https://github.com/GoogleCloudPlatform/$ASM_PACKAGE.git $HYBRID_HOME/$ASM_PACKAGE 2> /dev/null
+git clone --single-branch --branch $ASM_PACKAGE_VERSION_MINOR https://github.com/GoogleCloudPlatform/$ASM_PACKAGE.git $HYBRID_HOME/$ASM_PACKAGE 2> /dev/null
 
 # define ASM_HOME
 export ASM_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$ASM_TARBALL | grep LICENSE | cut -d "/" -f 1)
