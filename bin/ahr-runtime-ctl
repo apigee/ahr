@@ -191,15 +191,13 @@ cd $APIGEECTL_HOME
 if [[ " ${@} " =~ " wait-for-ready " ]]; then
 
     bash <<T
-cntr=1
-while true; do 
-    exit_code=\$(${@/wait-for-ready/check-ready}; echo \$?)
+while true; do
+    exit_code=\$(${@/wait-for-ready/check-ready} 2>/dev/null; echo \$?)
     if [ \$exit_code -ne 0 ]; then
         echo -n "."
         sleep 5
-        echo $(( cntr % 12 ))
-        cntr=$(( cntr+1 ))
     else
+        echo ""
         break
     fi
 done
@@ -528,7 +526,7 @@ echo "Pre-flight checks and settings: gcp project; enabling apis..."
 
 
 ## Hybrid Install Environment
-export HYBRID_VERSION_MINOR=$(echo "$HYBRID_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
+export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
 export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-$HYBRID_VERSION_MINOR.env}
 
