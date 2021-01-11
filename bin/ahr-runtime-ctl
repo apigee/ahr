@@ -528,8 +528,9 @@ echo "Pre-flight checks and settings: gcp project; enabling apis..."
 
 
 ## Hybrid Install Environment
+export HYBRID_VERSION_MINOR=$(echo "$HYBRID_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
 
-export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-14.env}
+export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-$HYBRID_VERSION_MINOR.env}
 
 
 mkdir -p $HYBRID_HOME
@@ -611,16 +612,16 @@ source <(ahr-cluster-ctl asm-get $ASM_VERSION)
 # Use supplied istio-operator.yaml 
 export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT} --format="value(projectNumber)")
 export ref=\$ref
-export ASM_RELEASE=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
+export ASM_VERSION_MINOR=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
 
-ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_RELEASE-$ASM_PROFILE.yaml > $ASM_CONFIG
+ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_VERSION_MINOR-$ASM_PROFILE.yaml > $ASM_CONFIG
 
 
 # common
 # mesh_id cluster label
 ahr-cluster-ctl cluster-add-labels "mesh_id=proj-$PROJECT_NUMBER"
 
-if [ "$ASM_RELEASE" = "1.5" ]; then
+if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
 
     istioctl manifest apply -f $ASM_CONFIG
 
@@ -672,7 +673,7 @@ echo "Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG..."
 
 # Install Hybrid runtime
 
-ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-13-template.yaml > $RUNTIME_CONFIG
+ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml > $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
