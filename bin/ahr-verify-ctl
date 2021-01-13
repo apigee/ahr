@@ -37,8 +37,8 @@ REQUIRED_APIS1=" \
     apigee.googleapis.com \
     apigeeconnect.googleapis.com \
     bigquery.googleapis.com \
-    bigquery.googleapis.com \
     bigquerystorage.googleapis.com \
+    \
     cloudapis.googleapis.com \
     clouddebugger.googleapis.com \
     cloudresourcemanager.googleapis.com \
@@ -238,8 +238,9 @@ fi
 #-----------------------------------------------------------------------
 elif [ "api-enable" == "$ACTION" ]; then
 
-    gcloud services enable $REQUIRED_APIS1
-    gcloud services enable $REQUIRED_APIS2
+  echo "ahr-verify-ctl: Enable APIs"
+  gcloud services enable $REQUIRED_APIS1
+  gcloud services enable $REQUIRED_APIS2
 
 #-----------------------------------------------------------------------
 elif [ "prereqs-install-yq" == "$ACTION" ]; then

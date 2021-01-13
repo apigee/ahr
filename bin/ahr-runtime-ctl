@@ -175,6 +175,7 @@ elif [ "get-apigeectl-home" == "$ACTION" ]; then
 #-----------------------------------------------------------------------
 elif [ "apigeectl" == "$ACTION" ]; then
 
+
 check_envvars "APIGEECTL_HOME"
 
 
@@ -470,9 +471,10 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo "Supported comma-separated components: cluster cert-manager gcp-ip istio apigee-org runtime "
         echo ""
         echo "Override if you wish (ie, set up before calling the operation):"
-        echo "    HYBRID_HOME HYBRID_ENV"
+        echo "    HYBRID_HOME HYBRID_VERSION"
         echo "    REGION ZONE AX_REGION"
         echo "    MACHINE_TYPE_DATA MACHINE_TYPE_RUNTIME"
+        echo "    ASM_VERSION CERT_MANAGER_MANIFEST"
         exit 5
     fi
 
@@ -522,24 +524,48 @@ export PROJECT
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";all;" ]]; then
 
-echo "Pre-flight checks and settings: gcp project; enabling apis..."
+echo -e "Pre-flight checks and settings: gcp project; product versions; enabling apis...\n"
 
 
-## Hybrid Install Environment
+## Hybrid Install Environment bootstrapping and version selection persistance
+#"
+
+export HYBRID_VERSION=${HYBRID_VERSION:-1.4.0}
+
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
-export HYBRID_ENV=${HYBRID_ENV:-$HYBRID_HOME/hybrid-$HYBRID_VERSION_MINOR.env}
+export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
 
 mkdir -p $HYBRID_HOME
 
-cp $AHR_HOME/examples/hybrid-sz-s-1.4.sh $HYBRID_ENV
+cp $AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh $HYBRID_ENV
+
+#' persist version selection
+sed -i -E "s/^(export HYBRID_VERSION=).*/\1$HYBRID_VERSION/g" $HYBRID_ENV
+
+if [ -n "$CERT_MANAGER_MANIFEST" ]; then
+  sed -i -E "s|^(export CERT_MANAGER_MANIFEST=).*|\1$CERT_MANAGER_MANIFEST|g" $HYBRID_ENV
+fi
+
+if [ -n "$AS_VERSION" ]; then
+  sed -i -E "s/^(export ASM_VERSION=).*/\1$ASM_VERSION/g" $HYBRID_ENV
+fi
 
 
-echo "Using Project: $PROJECT"
+source $HYBRID_ENV
+
+echo "Apigee Hybrid version: $HYBRID_VERSION"
+echo "Certificate Manager manifest: $CERT_MANAGER_MANIFEST"
+echo "ASM version: $ASM_VERSION"
+
+
+echo -e "\nUsing Project: $PROJECT"
+
 
 gcloud config set project $PROJECT
 
+echo "Sourcing Hybrid Environment: $HYBRID_ENV"
 source <(grep 'export REGION=' $HYBRID_ENV)
 
 ahr-verify-ctl api-enable
@@ -552,6 +578,9 @@ if [[ "$COMPS" =~ ";gcp-ip;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 echo "Provision Static IP Address and Configuring \$RUNTIME_IP variable..."
 
 
+    check_envvars "HYBRID_ENV REGION"
+
+
 # Provision Load Balancer
 set +e
 gcloud compute addresses create runtime-ip --region $REGION
@@ -560,9 +589,6 @@ set -e
 export RUNTIME_IP=$(gcloud compute addresses describe runtime-ip --region $REGION --format='value(address)')
 
 sed -i -E "s/^(export RUNTIME_IP=).*/\1$RUNTIME_IP/g" $HYBRID_ENV
-
-
-source $HYBRID_ENV
 
 fi
 
@@ -603,7 +629,7 @@ if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
 echo "ASM version: $ASM_VERSION"
 
-# Install ASM and add _HOME to PATH
+# Get ASM and add _HOME to PATH
 source <(ahr-cluster-ctl asm-get $ASM_VERSION)
 
 
