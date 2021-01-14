@@ -475,7 +475,7 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo "Override if you wish (ie, set up before calling the operation):"
         echo "    HYBRID_HOME HYBRID_VERSION"
         echo "    REGION ZONE AX_REGION"
-        echo "    MACHINE_TYPE_DATA MACHINE_TYPE_RUNTIME"
+        echo "    CLUSTER_VERSION MACHINE_TYPE_DATA MACHINE_TYPE_RUNTIME"
         echo "    ASM_VERSION CERT_MANAGER_MANIFEST"
         exit 5
     fi
