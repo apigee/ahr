@@ -461,10 +461,12 @@ elif [ "install-profile" == "$ACTION" ]; then
     if [ "$#" -lt 4 ]; then
         echo "ERROR: Either project or hybrid profile or asm profile are not provided."
         echo ""
-        echo "    ahr-runtime-ctl install-profile <project> <hybrid-profile> <asm-profile> [-c <comp[,comp]>]"
+        echo "    ahr-runtime-ctl install-profile <hybrid-profile> <asm-profile> [-c <comp[,comp]>]"
         echo ""
         echo "Example:"
-        echo "    ahr-runtime-ctl install-profile \$GOOGLE_CLOUD_PROJECT small asm-gcp"
+        echo "    ahr-runtime-ctl install-profile small asm-gcp"
+        echo ""
+        echo "Required Environment Variable: AHR_HOME PROJECT"
         echo ""
         echo "Supported hybrid profiles: small"
         echo "Supported asm profiles: asm-gcp asm-multicloud"
@@ -509,11 +511,10 @@ done
 eval set -- "$pps"
 
 
-    PROJECT=$2
     HYBRID_PROFILE=$3
     ASM_PROFILE=$4
 
-    check_envvars "AHR_HOME HYBRID_PROFILE ASM_PROFILE"
+    check_envvars "AHR_HOME PROJECT HYBRID_HOME HYBRID_PROFILE ASM_PROFILE"
 
 # 
 # profile: small
