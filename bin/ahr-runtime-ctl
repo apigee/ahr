@@ -458,8 +458,8 @@ EOT
 
 #-----------------------------------------------------------------------
 elif [ "install-profile" == "$ACTION" ]; then
-    if [ "$#" -lt 4 ]; then
-        echo "ERROR: Either project or hybrid profile or asm profile are not provided."
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: Either hybrid profile or asm profile parameters are not provided."
         echo ""
         echo "    ahr-runtime-ctl install-profile <hybrid-profile> <asm-profile> [-c <comp[,comp]>]"
         echo ""
@@ -511,8 +511,8 @@ done
 eval set -- "$pps"
 
 
-    HYBRID_PROFILE=$3
-    ASM_PROFILE=$4
+    HYBRID_PROFILE=$2
+    ASM_PROFILE=$3
 
     check_envvars "AHR_HOME PROJECT HYBRID_HOME HYBRID_PROFILE ASM_PROFILE"
 
@@ -545,11 +545,16 @@ cp $AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh $HYBRID_ENV
 #' persist version selection
 sed -i -E "s/^(export HYBRID_VERSION=).*/\1$HYBRID_VERSION/g" $HYBRID_ENV
 
+if [ -n "$CLUSTER_VERSION" ]; then
+  sed -i -E "s/^(export CLUSTER_VERSION=).*/\1$CLUSTER_VERSION/g" $HYBRID_ENV
+fi
+
+
 if [ -n "$CERT_MANAGER_MANIFEST" ]; then
   sed -i -E "s|^(export CERT_MANAGER_MANIFEST=).*|\1$CERT_MANAGER_MANIFEST|g" $HYBRID_ENV
 fi
 
-if [ -n "$AS_VERSION" ]; then
+if [ -n "$ASM_VERSION" ]; then
   sed -i -E "s/^(export ASM_VERSION=).*/\1$ASM_VERSION/g" $HYBRID_ENV
 fi
 
@@ -557,6 +562,9 @@ fi
 source $HYBRID_ENV
 
 echo "Apigee Hybrid version: $HYBRID_VERSION"
+
+echo "Kubernetes Cluster Version: $CLUSTER_VERSION"
+
 echo "Certificate Manager manifest: $CERT_MANAGER_MANIFEST"
 echo "ASM version: $ASM_VERSION"
 
@@ -600,6 +608,7 @@ if [[ "$COMPS" =~ ";cluster;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
     check_envvars "CLUSTER_CONFIG"
 
+echo "Kubernetes Cluster Version: $CLUSTER_VERSION"
 echo "Creating GKE Cluster using configuration: $CLUSTER_CONFIG..."
 
 # Create GKE cluster
