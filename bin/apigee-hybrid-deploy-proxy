@@ -65,38 +65,34 @@ esac
 done
 eval set -- "$pps"
 
-
-
-    if [ -z "$ORG" ]; then
-       printf "ERROR: ORG variable is not provided. Define either ORG environment variable or --org <org-name> CLI option\n\n"
-       
-       show_help
-       exit 2
-    fi
-
-    if [ -z "$ENV" ]; then
-       printf "ERROR: ENV variable is not provided. Define either ENV env variable or --env <env-name> CLI option\n\n"
-       
-       show_help
-       exit 2
-    fi
-
 export API="$1"
 export API_BUNDLE="$2"
 
+requiredvarsareset=Y
+
+    if [ -z "$ORG" ]; then
+       printf "ERROR: ORG variable is not provided. Define either ORG environment variable or --org <org-name> CLI option\n"
+       requiredvarsareset=N
+    fi
+
+    if [ -z "$ENV" ]; then
+       printf "ERROR: ENV variable is not provided. Define either ENV env variable or --env <env-name> CLI option\n"
+       requiredvarsareset=N
+    fi
     if [ -z "$API" ]; then
-       printf "ERROR: API Name is not provided\n\n"
-       
-       show_help
-       exit 2
+       printf "ERROR: API Name is not provided\n"
+       requiredvarsareset=N
     fi
     if [ -z "$API_BUNDLE" ]; then
-       printf "ERROR: API Bundle is not provided\n\n"
-
-       show_help
-       exit 2
+       printf "ERROR: API Bundle is not provided\n"
+       requiredvarsareset=N
     fi
 
+if [ "$requiredvarsareset" = "N" ]; then
+    echo ""
+    show_help
+    exit 1
+fi
 
 
 # import
