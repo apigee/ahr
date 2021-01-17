@@ -675,13 +675,15 @@ fi
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";apigee-org;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-echo "Configuring Apigee Organization: $ORG, Environment: $ENV..."
+    check_envvars "AHR_HOME ORG ENV ENV_GROUP AX_REGION"
+    check_envvars "SYNCHRONIZER_SA_ID RUNTIME_SSL_CERT RUNTIME_SSL_KEY RUNTIME_HOST_ALIAS"
+
+printf "\nAHR: Configuring Apigee Organization: $ORG, Environment: $ENV\n"
 
 # Get Hybrid installation and set up APIGEECTL_HOME in PATH
 source <(ahr-runtime-ctl get-apigeectl)
 
 
-source $AHR_HOME/bin/ahr-lib.sh
 ahr-runtime-ctl org-validate-name $ORG
 ahr-runtime-ctl org-create $ORG --ax-region $AX_REGION
 ahr-runtime-ctl env-create $ENV
@@ -703,7 +705,7 @@ fi
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";runtime;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-echo "Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG..."
+printf "\nAHR: Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG\n"
 
 # Install Hybrid runtime
 
@@ -717,7 +719,47 @@ ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 fi
 
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";source-env;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
+    check_envvars "PROJECT AHR_HOME HYBRID_HOME HYBRID_ENV ASM_VERSION APIGEECTL_HOME"
+
+
+  if [[ "$COMPS" =~ ";all;" ]]; then
+    echo -e "\nApigee Hybrid version $HYBRID_VERSION is installed.\n"
+  fi
+
+
+cat <<EOF >> $HYBRID_HOME/source.env
+export AHR_HOME=$AHR_HOME
+export PATH=\$AHR_HOME/bin:\$PATH
+
+source \$AHR_HOME/bin/ahr-completion.bash
+
+export PROJECT=$PROJECT
+export HYBRID_HOME=$HYBRID_HOME
+export HYBRID_ENV=$HYBRID_ENV
+source \$HYBRID_ENV
+
+alias k=kubectl
+source <(kubectl completion bash)
+complete -F __start_kubectl k
+
+export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
+export PATH=\$ASM_HOME/bin:\$PATH
+
+source \$ASM_HOME/tools/istioctl.bash
+
+export APIGEECTL_HOME=$APIGEECTL_HOME
+export PATH=\$APIGEECTL_HOME:\$PATH
+
+EOF
+
+echo "To set up your hybrid environment and deploy a ping proxy:"
+echo "  source $HYBRID_HOME/set.env"
+echo "  \$AHR_HOME/proxies/deploy.sh"
+
+fi
 
 #-----------------------------------------------------------------------
 else
