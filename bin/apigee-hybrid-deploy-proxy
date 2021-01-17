@@ -1,0 +1,128 @@
+#!/bin/bash
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" 
+
+
+function token { echo -n "$(gcloud config config-helper --force-auth-refresh | grep access_token | grep -o -E '[^ ]+$')" ; }
+
+
+function show_help(){
+
+cat <<EOT
+Apigee Hybrid Deploy Proxy utility
+
+Synopsis:
+
+   apigee-hybrid-deploy-proxy <api-name> <api-bundle-zip-file> [--org <org-name>] [--env <env-name>]
+   
+For options, either define environment varibles (uppercase) or use options notation (lowercase).
+If both are set, an option takes priority.
+
+Example
+   apigee-hybrid-deploy-proxy ping ping.zip
+
+EOT
+}
+set -e
+
+
+# variables:
+# ORG ENV
+
+pps=""
+
+# options
+while(($#)); do
+case "$1" in
+  -o|--org)
+    ORG="$2"
+
+    shift 2;;
+
+  -e|--env)
+    ENV="$2"
+
+    shift 2;;
+
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+
+
+    if [ -z "$ORG" ]; then
+       printf "ERROR: ORG variable is not provided. Define either ORG environment variable or --org <org-name> CLI option\n\n"
+       
+       show_help
+       exit 2
+    fi
+
+    if [ -z "$ENV" ]; then
+       printf "ERROR: ENV variable is not provided. Define either ENV env variable or --env <env-name> CLI option\n\n"
+       
+       show_help
+       exit 2
+    fi
+
+export API="$1"
+export API_BUNDLE="$2"
+
+    if [ -z "$API" ]; then
+       printf "ERROR: API Name is not provided\n\n"
+       
+       show_help
+       exit 2
+    fi
+    if [ -z "$API_BUNDLE" ]; then
+       printf "ERROR: API Bundle is not provided\n\n"
+
+       show_help
+       exit 2
+    fi
+
+
+
+# import
+
+export REV=$(curl --silent -H "Authorization: Bearer $(token)" -F file=@$API_BUNDLE -X POST "https://apigee.googleapis.com/v1/organizations/$ORG/apis?action=import&name=$API" | jq -r '.revision')
+
+# deploy
+echo "Deploying  Proxy: $API Revision: $REV to org: $ORG env: $ENV"
+curl --fail -H "Authorization: Bearer $(token)" -X POST "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/apis/$API/revisions/$REV/deployments?override=true"
+
+
+# wait till ready
+echo -n "Checking Deployment Status"
+STATUS=""
+while [ "$STATE" != "READY" ]; do
+    STATE=$(curl --silent -H "Authorization: Bearer $(token)" "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/apis/$API/revisions/$REV/deployments" | jq -r '.state')
+    echo -n "."
+    sleep 5
+done
+echo -e "\nProxy $API is deployed.\n"
+
+API_BASEPATH=$(unzip -p $API_BUNDLE apiproxy/proxies/default.xml|awk 'BEGIN{FS="(>|<)"}/<BasePath>/{print $3; exit }')
+
+cat <<EOF
+Sample request:
+  curl --cacert \$RUNTIME_SSL_CERT https://\$RUNTIME_HOST_ALIAS$API_BASEPATH -v --resolve "\$RUNTIME_HOST_ALIAS:443:\$RUNTIME_IP" --http1.1
+EOF
+
+
