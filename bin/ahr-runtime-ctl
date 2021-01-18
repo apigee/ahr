@@ -756,7 +756,7 @@ export PATH=\$APIGEECTL_HOME:\$PATH
 EOF
 
 echo "To set up your hybrid environment and deploy a ping proxy:"
-echo "  source $HYBRID_HOME/set.env"
+echo "  source $HYBRID_HOME/source.env"
 echo "  \$AHR_HOME/proxies/deploy.sh"
 
 fi
