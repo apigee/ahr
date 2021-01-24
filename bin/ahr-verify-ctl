@@ -246,7 +246,7 @@ elif [ "api-enable" == "$ACTION" ]; then
 elif [ "prereqs-install-yq" == "$ACTION" ]; then
 
   mkdir -p ~/bin
-  curl -L https://github.com/mikefarah/yq/releases/download/3.3.2/yq_linux_amd64 -o ~/bin/yq
+  curl --silent -L https://github.com/mikefarah/yq/releases/download/3.3.2/yq_linux_amd64 -o ~/bin/yq
   chmod +x ~/bin/yq
 
   echo "# To add ~/bin folder, execute:"
