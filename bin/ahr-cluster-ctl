@@ -287,6 +287,94 @@ EOY`
 echo "$CONFIG"
 
 
+
+#-----------------------------------------------------------------------
+elif [ "anthos-hub-register" == "$ACTION" ]; then
+
+# --context $CONTEXT --kube-config $KUBECONFIG --hub-key-file HUB_KEY_FILE
+
+
+    #=$2
+    #if [ "$ASM_VERSION" = "" ]; then
+    #   echo "Missing ASM Version Parameter. Ie:"
+    #   echo "  ahr-cluster-ctl anthos-hub-regiser \$"
+    #   echo ""
+    #   show_help
+    #   exit 1
+    #fi
+
+check_envvars "PROJECT CLUSTER"
+
+# AWS default: $AWS_USER@$CLUSTER.$AWS_REGION.eksctl.io
+# Azure default: $CLUSTER
+CLUSTER_CONTEXT=$(kubectl config current-context)
+KUBECONFIG_FILE='~/.kube/config'
+
+
+# TODO: [ ] what to do with json key file? we don't really to persist it. it's
+#           transient really
+# TODO: [ ] make it overrridable via --json-key-file
+
+HUB_IAM_ACCOUNT=anthos-hub@$PROJECT.iam.gserviceaccount.com
+HUB_JSON_KEY_FILE=$HYBRID_HOME/anthos-hub-$PROJECT.json
+
+cat <<EOF
+Anthos hub cluster membership registration:
+  context: $CLUSTER_CONTEXT
+  kube config: $KUBECONFIG_FILE
+  iam account: $HUB_IAM_ACCOUNT
+  json key file: $HUB_JSON_KEY_FILE
+
+EOF
+
+
+# Create service account
+gcloud iam service-accounts create anthos-hub --project=$PROJECT
+
+# Add gkehub.connect role
+gcloud projects add-iam-policy-binding $PROJECT \
+ --member="serviceAccount:$HUB_IAM_ACCOUNT" \
+ --role="roles/gkehub.connect"  > /dev/null
+
+# Create and download json key `$HYBRID_HOME/anthos-hub-$PROJECT.json`
+gcloud iam service-accounts keys create $HUB_JSON_KEY_FILE \
+  --iam-account=$HUB_IAM_ACCOUNT --project=$PROJECT
+
+# register a new membership
+gcloud container hub memberships register $CLUSTER \
+  --context=$CLUSTER_CONTEXT \
+  --kubeconfig=$KUBECONFIG_FILE \
+  --service-account-key-file=$HUB_JSON_KEY_FILE
+
+printf "\nCluser Membership registered"
+
+
+
+
+#-----------------------------------------------------------------------
+elif [ "anthos-user-ksa-create" == "$ACTION" ]; then
+
+
+kubectl create serviceaccount anthos-user
+
+kubectl create clusterrolebinding aksadminbinding --clusterrole view --serviceaccount default:anthos-user
+
+kubectl create clusterrolebinding aksadminnodereader --clusterrole node-reader --serviceaccount default:anthos-user
+
+kubectl create clusterrolebinding aksclusteradminbinding --clusterrole cluster-admin --serviceaccount default:anthos-user
+
+cat <<"EOF"
+Anthos user as KSA in your cluster is created
+
+To login into the EKS cluster, extact the token from a cluster secret using following commands:
+
+  CLUSTER_SECRET=$(kubectl get serviceaccount anthos-user -o jsonpath='{$.secrets[0].name}')
+  kubectl get secret ${CLUSTER_SECRET} -o jsonpath='{$.data.token}' | base64 --decode
+
+EOF
+
+
+
 #-----------------------------------------------------------------------
 elif [ "enable" == "$ACTION" ]; then
 
