@@ -698,6 +698,18 @@ ahr-verify-ctl cert-create-ssc $RUNTIME_SSL_CERT $RUNTIME_SSL_KEY $RUNTIME_HOST_
 fi
 
 #-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";runtime-config;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+    check_envvars "HYBRID_VERSION RUNTIME_CONFIG"
+
+printf "\nAHR: Generating Hybrid Runtime config: $RUNTIME_CONFIG\n"
+
+export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
+ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml > $RUNTIME_CONFIG
+
+fi
+
+#-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";runtime;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
     check_envvars "HYBRID_VERSION RUNTIME_CONFIG"
@@ -710,11 +722,6 @@ source <(ahr-runtime-ctl get-apigeectl)
 
 
 # Install Hybrid runtime
-
-export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
-
-
-ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml > $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
