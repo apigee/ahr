@@ -15,3 +15,6 @@ output aws_private_subnet_3_id {
   value = aws_subnet.aws_private_subnet_3.id
 }
 
+output aws_vpc_sg_id {
+  value = data.aws_security_group.aws_vpc_sg.id
+}

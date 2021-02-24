@@ -5,7 +5,6 @@ BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # just bootstrap, nothing noughty, actually
 
-
 export PROJECT=$(gcloud projects list|grep qwiklabs-gcp|awk '{print $1}')
 export GCP_OS_USERNAME=$(gcloud config get-value account | awk -F@ '{print $1}' )
 
@@ -17,13 +16,11 @@ ssh-keygen -t rsa -C "aws-key" -f ~/.ssh/id_aws -P ""
 export AWS_KEY_NAME=aws-key
 export AWS_SSH_PUB_KEY_FILE=~/.ssh/id_aws.pub
 
-# override if required
-REGION="europe-west1"
-ZONE="europe-west1-b"
 
+export TF_MODULE=gcp-aws-vpc-infra-tf
 
-GCP_TFVARS=gcp.auto.tfvars
-AWS_TFVARS=aws.auto.tfvars
+GCP_TFVARS=$TF_MODULE/gcp.auto.tfvars
+AWS_TFVARS=$TF_MODULE/aws.auto.tfvars
 
 
 # lif $GCP_TFVARS "project = " $PROJECT
@@ -39,7 +36,7 @@ gcp_ssh_pub_key_file = "$GCP_SSH_PUB_KEY_FILE"
 
 EOF
 
-awk -f env-to-tfvars.awk mc-gcp-networking.env >> "$GCP_TFVARS"
+awk -f $BASEDIR/env-to-tfvars.awk mc-gcp-networking.env >> "$GCP_TFVARS"
 
 source mc-aws-networking.env
 
@@ -48,5 +45,5 @@ aws_key_name = "$AWS_KEY_NAME"
 aws_ssh_pub_key_file = "$AWS_SSH_PUB_KEY_FILE"
 EOF
 
-awk -f env-to-tfvars.awk mc-aws-networking.env >> "$AWS_TFVARS"
+awk -f $BASEDIR/env-to-tfvars.awk mc-aws-networking.env >> "$AWS_TFVARS"
 

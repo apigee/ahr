@@ -5,6 +5,9 @@ variable aws_vpc { type = string }
 
 variable aws_public_subnet { type = string }
 
+variable aws_vpn_gw_name { type = string }
+variable gcp_vpc_cidr { type = string }
+
 
 variable cluster { type = string }
 

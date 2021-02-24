@@ -1,0 +1,28 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: $CLUSTER
+  region: $AWS_REGION
+  version: "$CLUSTER_VERSION"
+
+kubernetesNetworkConfig:
+  serviceIPv4CIDR: $AWS_SERVICE_IPV4_CIDR
+
+managedNodeGroups:
+  - name: ng-apigee
+    instanceType: $INSTANCE_TYPE_DATA
+    desiredCapacity: 3
+    privateNetworking: true
+    securityGroups:
+      attachIDs: ["$AWS_VPC_SG_ID"]
+
+vpc:
+  id: "$AWS_VPC_ID"
+  subnets:
+    private:
+      $AWS_ZONE_1:
+        id: "$AWS_PRIVATE_SUBNET_1_ID"
+      $AWS_ZONE_2:
+        id: "$AWS_PRIVATE_SUBNET_2_ID"
+      $AWS_ZONE_3:
+        id: "$AWS_PRIVATE_SUBNET_3_ID"

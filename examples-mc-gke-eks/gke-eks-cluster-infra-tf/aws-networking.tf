@@ -11,6 +11,19 @@ data "aws_subnet" "aws_public_subnet" {
   }
 }
 
+data "aws_vpn_gateway" "aws_vpn_gw" {
+  attached_vpc_id = data.aws_vpc.aws_vpc.id
+  tags = {
+    Name = "${var.aws_vpn_gw_name}"
+  }
+}
+
+data "aws_security_group" "aws_vpc_sg" {
+  name = "default"
+  vpc_id = data.aws_vpc.aws_vpc.id
+}
+
+
 # NAT Gateway
 resource "aws_eip" "nat_gw_eip" {
   vpc      = true
@@ -36,6 +49,11 @@ resource "aws_route_table" "rtb_private_subnet" {
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_nat_gateway.nat_gw.id
+  }
+
+  route {
+    cidr_block = var.gcp_vpc_cidr
+    gateway_id = data.aws_vpn_gateway.aws_vpn_gw.id
   }
 
   tags = {
@@ -93,3 +111,4 @@ resource "aws_route_table_association" "rtb_assoc_3" {
   subnet_id      = aws_subnet.aws_private_subnet_3.id
   route_table_id = aws_route_table.rtb_private_subnet.id
 }
+

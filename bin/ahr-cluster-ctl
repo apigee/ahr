@@ -329,7 +329,9 @@ EOF
 
 
 # Create service account
+set +e
 gcloud iam service-accounts create anthos-hub --project=$PROJECT
+set -e
 
 # Add gkehub.connect role
 gcloud projects add-iam-policy-binding $PROJECT \
