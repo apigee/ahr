@@ -3,16 +3,14 @@ BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 set -e
 
-check_vars "AHR_HOME PROJECT GCP_OS_USERNAME AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION HYBRID_HOME"
-
-
-export PATH=$AHR_HOME/bin:$PATH
-
 # useful functions
 source $AHR_HOME/bin/ahr-lib.sh
 
+check_vars "AHR_HOME PROJECT GCP_OS_USERNAME AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION HYBRID_HOME"
+
 ./bs-prereqisites.sh
 
+export PATH=$AHR_HOME/bin:$PATH
 export PATH=~/bin:$PATH
 
 # gcp
