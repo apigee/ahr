@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 export HYBRID_ENV=$HYBRID_HOME/mc-r2-eks.env
 source $HYBRID_ENV
 
@@ -15,6 +17,8 @@ kubectl config use-context $R2_CLUSTER
 kubectl create namespace cert-manager
 
 kubectl --context=$R1_CLUSTER get secret apigee-ca --namespace=cert-manager -o yaml | kubectl --context=$R2_CLUSTER apply --namespace=cert-manager -f -
+
+kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST
 
 export ASM_PROFILE=asm-multicloud
 sed -i -E "s/^(export ASM_PROFILE=).*/\1$ASM_PROFILE/g" $HYBRID_ENV

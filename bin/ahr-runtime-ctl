@@ -166,11 +166,18 @@ elif [ "get-apigeectl-home" == "$ACTION" ]; then
      exit 8
   fi
 
-  GET_HOME_ABS_DIR=$(cd "$(dirname "$GET_HOME_APIGEE_TARBALL")"; pwd)
+  GET_HOME_ABS_DIR=$(cd "$(dirname "$GET_HOME_APIGEECTL_TARBALL")"; pwd)
 
   GET_HOME_APIGEECTL_HOME=$(tar tf $GET_HOME_APIGEECTL_TARBALL | grep VERSION.txt | cut -d "/" -f 1)
 
-  echo -n "$GET_HOME_ABS_DIR/$GET_HOME_APIGEECTL_HOME"
+  APIGEECTL_HOME="$GET_HOME_ABS_DIR/$GET_HOME_APIGEECTL_HOME"
+
+  echo "# To define APIGEECTL_HOME in your shell, execute:"
+  echo "#   source <(ahr-runtime-ctl get-apigeectl-home \$HYBRID_HOME/\$APIGEECTL_TARBALL)"
+
+  echo "export APIGEECTL_HOME=$APIGEECTL_HOME"
+  echo "export PATH=\$APIGEECTL_HOME:\$PATH"
+
 
 #-----------------------------------------------------------------------
 elif [ "apigeectl" == "$ACTION" ]; then
@@ -742,7 +749,7 @@ if [[ "$COMPS" =~ ";source-env;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
   fi
 
 
-cat <<EOF >> $HYBRID_HOME/source.env
+cat <<EOF > $HYBRID_HOME/source.env
 export AHR_HOME=$AHR_HOME
 export PATH=\$AHR_HOME/bin:\$PATH
 

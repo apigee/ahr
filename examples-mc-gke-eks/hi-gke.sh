@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 export HYBRID_ENV=$HYBRID_HOME/mc-r1-gke.env
 source $HYBRID_ENV
 
@@ -18,4 +20,5 @@ ahr-runtime-ctl install-profile small asm-gcp -c apigee-org
 ahr-runtime-ctl install-profile small asm-gcp -c runtime-config
 ahr-runtime-ctl install-profile small asm-gcp -c runtime
 
+source <(ahr-runtime-ctl get-apigeectl-home $HYBRID_HOME/$APIGEECTL_TARBALL)
 ahr-runtime-ctl install-profile small asm-gcp -c source-env

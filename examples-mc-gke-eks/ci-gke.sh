@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 export HYBRID_ENV=$HYBRID_HOME/mc-r1-gke.env
 source $HYBRID_ENV
 

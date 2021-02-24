@@ -1,12 +1,15 @@
 #!/bin/bash
 
-export HYBRID_HOME=~/apigee-hybrid-multicloud
+set -e
 
 cp -R $AHR_HOME/examples-mc-gke-eks/ $HYBRID_HOME
 
 
 source $HYBRID_HOME/mc-r2-eks.env
+
+pushd $HYBRID_HOME/gke-eks-cluster-infra-tf
 source <(terraform output |awk '{printf( "export %s=%s\n", toupper($1), $3)}')
+popd
 
 ahr-cluster-ctl template $HYBRID_HOME/eks-cluster-template.yaml > $HYBRID_HOME/eks-cluster-config.yaml
 

@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +23,17 @@ set -e
 
 
 # variables:
-# PROJECT ORG ENV
+# ORG ENV
+if [ -z "$ORG" ]; then
+  echo "Required environment variable \$ORG is not set."
+  exit 1
+fi
+if [ -z "$ENV" ]; then
+  echo "Required environment variable \$ENV is not set."
+  exit 1
+fi
+
+
 
 export API=ping
 export API_BUNDLE=$BASEDIR/ping_rev1_2020_05_27.zip
