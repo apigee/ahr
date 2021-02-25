@@ -18,14 +18,6 @@ eksctl create cluster -f $HYBRID_HOME/eks-cluster-config.yaml
 ahr-cluster-ctl anthos-hub-register
 ahr-cluster-ctl anthos-user-ksa-create
 
-
-
-echo "Token for Attached cluster login\n"
-
-CLUSTER_SECRET=$(kubectl get serviceaccount anthos-user -o jsonpath='{$.secrets[0].name}')
-
-kubectl get secret ${CLUSTER_SECRET} -o jsonpath='{$.data.token}' | base64 --decode
-
-
+# rename context to $CLUSTER
 export EKS_DEFAULT_CONTEXT=$(aws iam get-user --query 'User.UserName' --output text)@$CLUSTER.$AWS_REGION.eksctl.io ; echo $EKS_DEFAULT_CONTEXT
 kubectl config rename-context $EKS_DEFAULT_CONTEXT $R2_CLUSTER
