@@ -1,4 +1,10 @@
 #!/bin/bash
+
+# example usage:
+#  time ./install.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
+#
+
+
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 set -e
@@ -40,7 +46,7 @@ terraform apply -auto-approve
 popd
 
 # eks to a parallel fork, join before eks hybrid deploy
-export EKS_CLUSTER_LOG=${EKS_CLUSTER_LOG:-$HYBRID_HOME/eks-cluster.log}
+export EKS_CLUSTER_LOG=${EKS_CLUSTER_LOG:-$HYBRID_HOME/mc-install-eks-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log}
 echo "Building EKS cluser in background; progress log: $EKS_CLUSTER_LOG"
 
 nohup bash <<EOS &> $EKS_CLUSTER_LOG &

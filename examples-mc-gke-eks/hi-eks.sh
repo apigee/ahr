@@ -59,7 +59,7 @@ export DC1_CS_SEED_NODE=$(echo "$CS_STATUS" | awk '/dc-1/{getline;getline;getlin
 
 ahr-runtime-ctl install-profile small asm-gcp -c runtime-config
 
-yq m -i $RUNTIME_CONFIG - <<EOF                                                          
+yq m -i $RUNTIME_CONFIG - <<EOF
 cassandra:
   multiRegionSeedHost: $DC1_CS_SEED_NODE
   datacenter: "dc-2"
