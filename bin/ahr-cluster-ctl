@@ -48,14 +48,16 @@ fi
 
 echo "Cluster definition: $CLUSTER_CONFIG"
 
-
 response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" https://container.googleapis.com/v1beta1/projects/$PROJECT/zones/$CLUSTER_ZONE/clusters --data-binary @$CLUSTER_CONFIG)
 if [ $( grep -c error <<< "$response" ) -ne 0  ]; then
-    echo "$response"
-
+  echo "$response"
+  if [[ "$response" =~ "ALREADY_EXISTS" ]]; then
+    # ignore cluster already exists
+    echo "Cluster already exists. Continue."
+  else
     exit 1
+  fi
 fi
-
 
 # check operation status
 operation=$( jq .name <<< "$response" )

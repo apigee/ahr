@@ -39,19 +39,26 @@ terraform init
 terraform apply -auto-approve
 popd
 
-# TODO: [ ] eks to parallel fork, join before eks hybrid
-#
-#
+# eks to a parallel fork, join before eks hybrid deploy
+export EKS_CLUSTER_LOG=${EKS_CLUSTER_LOG:-$HYBRID_HOME/eks-cluster.log}
+echo "Building EKS cluser in background; progress log: $EKS_CLUSTER_LOG"
+
+nohup bash <<EOS &> $EKS_CLUSTER_LOG &
+./ci-eks.sh
+EOS
+export EKS_CLUSTER_PID=$!
+
 
 ./ci-gke.sh
-
-./ci-eks.sh
 
 
 ./hi-gke.sh
 
 source $HYBRID_HOME/source.env
 $AHR_HOME/proxies/deploy.sh
+
+echo "Making sure EKS cluster is ready before progressing [pid: $EKS_CLUSTER_PID]..."
+wait $EKS_CLUSTER_PID
 
 ./hi-eks.sh
 
