@@ -4,7 +4,7 @@ BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # aws, eksctl
 curl -O https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
-unzip awscli-exe-linux-x86_64.zip
+unzip awscli-exe-linux-x86_64.zip > /dev/null
 mkdir ~/bin
 ./aws/install -i ~/bin -b ~/bin
 
