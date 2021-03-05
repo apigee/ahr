@@ -1,3 +1,12 @@
+#Update: 
+
+#The improved version of the script is now a part of the apigee devrel project:
+
+# https://github.com/apigee/devrel/tree/main/tools/apigee-x-trial-provision
+
+
+<hr>
+
 # Apigee ngSaaS Trial Install Wrapper Script
 
 This script creates an ng-saas trial instance. It uses gcloud command to create a hybrid runtime and add an enovoy load balancer for external exposure.
