@@ -1,6 +1,6 @@
-#Update: 
+# <span style="color:red">Update:</span> 
 
-#The improved version of the script is now a part of the apigee devrel project:
+# The improved version of the script is now a part of the apigee devrel project:
 
 # https://github.com/apigee/devrel/tree/main/tools/apigee-x-trial-provision
 
