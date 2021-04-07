@@ -655,23 +655,14 @@ export ASM_VERSION_MINOR=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,
 
 ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_VERSION_MINOR-$ASM_PROFILE.yaml > $ASM_CONFIG
 
+# Configure GKE cluster
+ahr-cluster-ctl asm-gke-configure "$ASM_VERSION_MINOR"
+
 
 # common
-# mesh_id cluster label
-ahr-cluster-ctl cluster-add-labels "mesh_id=proj-$PROJECT_NUMBER"
-
 if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
-
     istioctl manifest apply -f $ASM_CONFIG
-
 else # >= 1.6
-
-    export WORKLOAD_POOL=${PROJECT}.svc.id.goog
-
-    gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
-
-    curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data ''
-
     istioctl install -f $ASM_CONFIG
 fi
 

@@ -189,6 +189,38 @@ echo "#   source <(ahr-runtime-ctl home)"
 
 
 #'-----------------------------------------------------------------------
+elif [ "asm-gke-configure" == "$ACTION" ]; then
+
+    ASM_VERSION_MINOR=$2
+    if [ "$ASM_VERSION_MINOR" = "" ]; then
+       echo "Missing ASM Version Minor Value: 1.x"
+       echo ""
+       show_help
+       exit 1
+    fi
+
+  check_envvars "PROJECT ASM_VERSION HYBRID_HOME"
+
+# mesh_id cluster label
+PROJECT_NUMBER=$(gcloud projects describe ${PROJECT} --format="value(projectNumber)")
+
+ahr-cluster-ctl cluster-add-labels "mesh_id=proj-$PROJECT_NUMBER"
+
+if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
+
+    :
+
+else # >= 1.6
+
+    export WORKLOAD_POOL=${PROJECT}.svc.id.goog
+
+    gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
+
+    curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data ''
+
+fi
+
+#'-----------------------------------------------------------------------
 elif [ "asm-template" == "$ACTION" ]; then
 
     TEMPLATE=$2
@@ -273,15 +305,6 @@ spec:
                 targetPort: 80
               - name: https
                 port: 443
-              - name: prometheus
-                port: 15030
-                targetPort: 15030
-              - name: tcp
-                port: 31400
-                targetPort: 31400
-              - name: tls
-                port: 15443
-                targetPort: 15443
           hpaSpec:
             maxReplicas: 3
 EOY`
