@@ -545,6 +545,8 @@ export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
 mkdir -p $HYBRID_HOME
 
+export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
+
 cp $AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh $HYBRID_ENV
 
 #' persist version selection
