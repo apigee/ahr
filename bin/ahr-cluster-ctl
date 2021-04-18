@@ -78,6 +78,8 @@ set +e
 # get cluster context for kubectl
 gcloud container clusters get-credentials $CLUSTER --zone $CLUSTER_ZONE
 
+set -e
+
 # rename default cluster name to the required one
 GKE_CONTEXT=gke_${PROJECT}_${CLUSTER_ZONE}_${CLUSTER}
 kubectl config rename-context $GKE_CONTEXT $CONTEXT

@@ -26,7 +26,7 @@ resource "google_compute_firewall" "allow_ssh" {
 }
 
 resource "google_compute_subnetwork" "gcp_subnet" {
-  name = "gcp-subnet"
+  name = var.gcp_vpc_subnet
   ip_cidr_range = var.gcp_vpc_subnet_cidr
   network = google_compute_network.gcp_vpc.name
   region = var.gcp_region

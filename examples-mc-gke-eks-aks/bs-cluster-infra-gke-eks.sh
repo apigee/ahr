@@ -3,7 +3,7 @@
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 
-export TF_MODULE=gke-eks-cluster-infra-tf
+export TF_MODULE=infra-cluster-gke-eks-tf
 
 # 
 GCP_TFVARS=$TF_MODULE/gcp.auto.tfvars
@@ -21,4 +21,4 @@ aws_vpn_gw_name = "$AWS_VPN_GW_NAME"
 gcp_vpc_cidr = "$GCP_VPC_CIDR"
 EOF
 
-awk -f $BASEDIR/env-to-tfvars.awk mc-r2-eks.env >> "$AWS_TFVARS"
+awk -f $BASEDIR/tf-env-to-tfvars.awk mc-r2-eks.env >> "$AWS_TFVARS"
