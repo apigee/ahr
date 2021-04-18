@@ -20,6 +20,7 @@ kubectl --context=$R1_CLUSTER get secret apigee-ca --namespace=cert-manager -o y
 
 kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST
 
+
 export ASM_PROFILE=asm-multicloud
 sed -i -E "s/^(export ASM_PROFILE=).*/\1$ASM_PROFILE/g" $HYBRID_ENV
 export ASM_RELEASE=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
@@ -57,6 +58,7 @@ CS_STATUS=$(kubectl --context $R1_CLUSTER -n apigee exec apigee-cassandra-defaul
 
 export DC1_CS_SEED_NODE=$(echo "$CS_STATUS" | awk '/dc-1/{getline;getline;getline;getline;getline; print $2}')
 
+# Apigee hybrid runtime
 ahr-runtime-ctl install-profile small asm-gcp -c runtime-config
 
 yq m -i $RUNTIME_CONFIG - <<EOF
