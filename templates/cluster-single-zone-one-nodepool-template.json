@@ -58,6 +58,9 @@
     "ipAllocationPolicy": {
       "useIpAliases": true
     },
+    "workloadIdentityConfig": {
+      "workloadPool": "$PROJECT.svc.id.goog"
+    },
     "masterAuthorizedNetworksConfig": {},
     "defaultMaxPodsConstraint": {
       "maxPodsPerNode": "110"
