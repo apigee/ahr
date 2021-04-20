@@ -11,7 +11,7 @@ kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST
 
 echo "ASM version: $ASM_VERSION"
 
-# internal IP provisioning 
+# internal IP provisioning
 gcloud compute addresses create runtime-ip \
     --region "$GCP_REGION" \
     --subnet "$GCP_VPC_SUBNET" \
