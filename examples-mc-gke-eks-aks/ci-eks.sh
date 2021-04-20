@@ -4,7 +4,7 @@ set -e
 
 source $HYBRID_HOME/mc-r2-eks.env
 
-pushd $HYBRID_HOME/gke-eks-cluster-infra-tf
+pushd $HYBRID_HOME/infra-cluster-gke-eks-tf
 source <(terraform output |awk '{printf( "export %s=%s\n", toupper($1), $3)}')
 popd
 

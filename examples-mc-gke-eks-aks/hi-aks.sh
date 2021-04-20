@@ -70,11 +70,13 @@ ahr-runtime-ctl install-profile small asm-gcp -c runtime
 # TODO: [ ] ?? check that result is as expected for three DCS; at least output the status
 kubectl --context $R1_CLUSTER -n apigee exec apigee-cassandra-default-0 -- nodetool -u $CS_USERNAME -pw $CS_PASSWORD status
 
-kubectl --context $R2_CLUSTER exec apigee-cassandra-default-0 -n apigee  -- nodetool -u $CS_USERNAME -pw $CS_PASSWORD rebuild -- dc-1 
-
 kubectl --context $R3_CLUSTER exec apigee-cassandra-default-0 -n apigee  -- nodetool -u $CS_USERNAME -pw $CS_PASSWORD rebuild -- dc-1 
 
 # reset seed node
 yq d -i $RUNTIME_CONFIG cassandra.multiRegionSeedHost
 
 ahr-runtime-ctl apigeectl apply --datastore -f $RUNTIME_CONFIG
+
+# Generate source.env for R3_CLUSTER
+# TODO: [ ] source <(ahr-runtime-ctl get-apigeectl-home $HYBRID_HOME/$APIGEECTL_TARBALL)
+# TODO: [ ] ahr-runtime-ctl install-profile small asm-gcp -c source-env

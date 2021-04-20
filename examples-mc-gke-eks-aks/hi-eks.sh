@@ -79,3 +79,7 @@ kubectl --context $R2_CLUSTER exec apigee-cassandra-default-0 -n apigee  -- node
 yq d -i $RUNTIME_CONFIG cassandra.multiRegionSeedHost
 
 ahr-runtime-ctl apigeectl apply --datastore -f $RUNTIME_CONFIG
+
+# Generate source.env for R2_CLUSTER
+# TODO: [ ] source <(ahr-runtime-ctl get-apigeectl-home $HYBRID_HOME/$APIGEECTL_TARBALL)
+# TODO: [ ] ahr-runtime-ctl install-profile small asm-gcp -c source-env

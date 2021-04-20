@@ -12,36 +12,62 @@ Of course, you need an active account at each of the two or three clouds.
 
 ?. SSH into it
 
+## Install Prerequisites and Cloud CLIs
+
+?. Have a GCP, AWS, and Azure projects ready.
+
+?. Create a bastion VM in your GCP project.
+
 ?. Install utilites required by cloud cli utilities
 
 ```sh
+sudo apt-get update
 sudo apt -y install mc jq git python3-pip
 ```
 
-?. 
 
-```sh
-git clone https://github.com/yuriylesyuk/tf-multi-cloud-infra.git
+?. Clone Ahr repo and define Ahr variables
 ```
+export AHR_HOME=~/ahr
+
+cd ~
+git clone https://github.com/apigee/ahr.git
+```
+
+?. Define HYBRID_HOME
+
+```
+export HYBRID_HOME=~/apigee-hybrid-multicloud
+
+mkdir -p $HYBRID_HOME
+
+cp -R $AHR_HOME/examples-mc-gke-eks-aks/. $HYBRID_HOME
+```
+
 
 ?. CLIs
 
 ```sh
-cd tf-multi-cloud-infra
+cd $HYBRID_HOME
+
+sudo apt-get install kubectl
 
 ./cli-terraform.sh
 ./cli-aws.sh
 ./cli-az.sh
+
+$AHR_HOME/bin/ahr-verify-ctl prereqs-install-yq
 
 source ~/.profile
 ```
 
 ### Cloud Logins
 
-?. GCP: For Qwiklabs/CloudShell:
+?. __GCP:__ For Qwiklabs/CloudShell:
 
 ```sh
 ## for operator
+# TODO: [] move to bastion 
 gcloud auth login --quiet
 
 # use those pre-canned commands if you're using qwiklabs
@@ -63,13 +89,13 @@ gcloud auth application-default login --quiet
 ?. for a current session
 
 ```sh
-export AWS_PAGER=
-export AWS_ACCESS_KEY_ID=
-export AWS_SECRET_ACCESS_KEY=
+export AWS_ACCESS_KEY_ID=<access-key>
+export AWS_SECRET_ACCESS_KEY=<secret-access-key>
 export AWS_REGION=us-east-1
+export AWS_PAGER=
 ```
 
-?. user-wide
+?. Define AWS user-wide credencials file
 
 ```sh
 mkdir ~/.aws
@@ -88,25 +114,28 @@ EOF
 ```sh
 az login
 ```
+?. Check we are logged in
+```
+echo "Check if logged in gcloud: "
+gcloud compute instances list
 
-## Create Infrastructure
+echo "Check if logged in aws: "
+aws sts get-caller-identity
 
-?. to install gcp/aws, execute
-
-```sh
-./install-gcp-aws.sh
+echo "Check if logged in az: "
+az account show
 ```
 
-?. to install gcp/aws/azure, execute
 
-```sh
-install-gcp-aws-az.sh
+# Install Apigee Hybrid Multi-cloud
+
+**WARNING:** Install takes around 40 minutes. If you are using Cloud Shell (which by design is meant for an interactive work only), make sure you keep your install session alive, as CloudShell has  an inactivity timeout. For details, see: https://cloud.google.com/shell/docs/limitations#usage_limits
+
 ```
+cd $HYBRID_HOME
+./install-apigee-hybrid-gke-eks-aws.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
+``` 
 
-> NOTE: to see the plan, use
-> ```sh
-> terraform plan 2>&1| less -r
-> ```
 
 ### Validate connectivity
 
@@ -114,7 +143,9 @@ After the install finished, you can use provisioned jumpboxes and suggested comm
 
 ```sh
 # to define jumpboxes IP address
+pushd infra-cluster-az-tf
 source <(terraform output |awk '{printf( "export %s=%s\n", toupper($1), $3)}')
+popd
 
 gcloud compute config-ssh
 gcloud compute ssh vm-gcp --ssh-key-file ~/.ssh/id_gcp --zone europe-west1-b
@@ -131,4 +162,21 @@ hostname -i
 # sudo yum install -y nc
 
 while true ; do  echo -e "HTTP/1.1 200 OK\n\n $(date)" | nc -l -p 7001  ; done
+```
+
+
+## Remove resources
+
+```
+pushd infra-cluster-az-tf
+terraform destroy
+popd
+
+pushd infra-cluster-gke-eks-tf
+terraform destroy
+popd
+
+pushd infra-gcp-aws-az-tf
+terraform destroy
+popd
 ```

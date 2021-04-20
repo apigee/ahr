@@ -46,4 +46,3 @@ az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER
 
 ahr-cluster-ctl anthos-hub-register
 ahr-cluster-ctl anthos-user-ksa-create
-

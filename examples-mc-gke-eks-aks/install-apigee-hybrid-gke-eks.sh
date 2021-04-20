@@ -31,16 +31,16 @@ cd $HYBRID_HOME
 
 
 # Build GCP/AWS VPC/VPN Infrastructure
-./bs-networking.sh
+./bs-gcp-aws.sh
 
 pushd gcp-aws-vpc-infra-tf
 terraform init
 terraform apply -auto-approve
 popd
 
-./bs-cluster-infra.sh
+./bs-cluster-gke-eks.sh
 
-pushd gke-eks-cluster-infra-tf
+pushd gke-cluster-gke-eks-tf
 terraform init
 terraform apply -auto-approve
 popd
