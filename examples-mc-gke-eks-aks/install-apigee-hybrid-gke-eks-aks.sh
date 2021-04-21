@@ -48,6 +48,29 @@ terraform init
 terraform apply -auto-approve
 popd
 
+./ci-gke.sh
+./hi-gke.sh
+
+source $HYBRID_HOME/source.env
+$AHR_HOME/proxies/deploy.sh
+
+./ci-eks.sh
+./hi-eks.sh
+
+
+./ci-aks.sh
+./hi-aks.sh
+
+
+
+#
+# skip parallel fork for now: 
+# it doesn't work as is because kubernetes create cluster commands override default enty
+#
+if false; then
+
+# TODO: [ ] change to KUBECONFIG-based implementation
+
 
 # eks to a parallel fork, join before eks hybrid deploy
 export EKS_CLUSTER_LOG=${EKS_CLUSTER_LOG:-$HYBRID_HOME/mc-install-eks-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log}
@@ -57,6 +80,7 @@ nohup bash <<EOS &> $EKS_CLUSTER_LOG &
 ./ci-eks.sh
 EOS
 export EKS_CLUSTER_PID=$!
+
 
 # eks to a parallel fork, join before eks hybrid deploy
 export AKS_CLUSTER_LOG=${AKS_CLUSTER_LOG:-$HYBRID_HOME/mc-install-aks-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log}
@@ -89,5 +113,5 @@ wait $AKS_CLUSTER_PID
 
 ./hi-aks.sh
 
-
+fi
 

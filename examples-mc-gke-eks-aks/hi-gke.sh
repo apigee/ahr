@@ -12,10 +12,13 @@ kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST
 echo "ASM version: $ASM_VERSION"
 
 # internal IP provisioning
+set +e
 gcloud compute addresses create runtime-ip \
     --region "$GCP_REGION" \
     --subnet "$GCP_VPC_SUBNET" \
     --purpose SHARED_LOADBALANCER_VIP
+set -e
+
 export RUNTIME_IP=$(gcloud compute addresses describe runtime-ip --region "$GCP_REGION" --format='value(address)')
 
 sed -i -E "s/^(export RUNTIME_IP=).*/\1$RUNTIME_IP/g" $HYBRID_ENV
