@@ -39,6 +39,7 @@ if [ "create" == "$ACTION" ]; then
 
 
 check_envvars "CLUSTER CLUSTER_CONFIG CLUSTER_ZONE CONTEXT PROJECT"
+check_commands "jq kubectl"
 
 if [ ! -f "$CLUSTER_CONFIG" ]; then
     echo "Cluster file doesn't exist: $CLUSTER_CONFIG"
@@ -85,10 +86,7 @@ GKE_CONTEXT=gke_${PROJECT}_${CLUSTER_ZONE}_${CLUSTER}
 kubectl config rename-context $GKE_CONTEXT $CONTEXT
 
 # set the cluster role binding
-# TODO: check if really needed []
 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user $(gcloud config get-value account)
-echo "TODO:..."
-exit 1
 
 #'-----------------------------------------------------------------------
 elif [ "template" == "$ACTION" ]; then

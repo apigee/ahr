@@ -13,6 +13,8 @@ popd
 
 export AKS_FULL_KUBERNETES_VERSION=$(az aks get-versions --location $AZ_REGION  | jq -r ".orchestrators[].orchestratorVersion| select(test(\"^$CLUSTER_VERSION.*\")) " | sort | tail -n1 ); echo $AKS_FULL_KUBERNETES_VERSION
 
+
+
 check_envvars " \
   RESOURCE_GROUP \
   CLUSTER \

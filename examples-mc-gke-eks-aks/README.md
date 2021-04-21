@@ -8,9 +8,65 @@ Of course, you need an active account at each of the two or three clouds.
 
  Use your working computer terminal or a VM  to overcome the timeout limit of CloudShell. We recommend to provision a default VM in your GCP project.
 
-?. Create a VM. Doesn't matter which OS you're using. The only difference is usage of apt vs yum for installing required packages. We accept defaults to speed up this step, thus we are using Debian.
 
-?. SSH into it
+## Bastion VM in a default network
+
+
+As a multi-cloud Apigee hybrid provisioning is a long-running process, let's provision a bastion VM. Bastion VM is also useful for troubleshooting, at it would be able to access private network addresses.
+
+We are going to:
+
+* create a Service Account;
+* add Editor and Network Admin roles to it;
+* provision a VM with scope and service account that will allow execute the provisioning script successfully;
+* invoke SSH session at the VM.
+
+1. In the GCP Console, activate Cloud Shell
+
+1. Define PROJECT variable
+
+```sh
+export PROJECT=<your-project-id>
+export BASION_ZONE=europe-west1-b
+```
+
+1. Create a service account for installation purposes.
+
+Click at the Authorize button when asked.
+
+```sh
+export INSTALLER_SA_ID=installer-sa
+
+gcloud iam service-accounts create $INSTALLER_SA_ID
+```
+
+1. Add IAM policy bindings with required roles
+
+```sh
+roles='roles/editor 
+       roles/compute.networkAdmin
+       roles/iam.securityAdmin
+       roles/container.admin'
+
+for r in $roles; do
+    gcloud projects add-iam-policy-binding $PROJECT \
+        --member="serviceAccount:$INSTALLER_SA_ID@$PROJECT.iam.gserviceaccount.com" \
+        --role=$r
+done
+```
+
+1. Create a compute instance with installer SA identity that will be used to execute script.
+
+```sh
+gcloud compute instances create bastion \
+    --service-account "$INSTALLER_SA_ID@$PROJECT.iam.gserviceaccount.com" \
+    --zone $BASION_ZONE \
+    --scopes cloud-platform
+```
+
+1. In GCP Console, open Compute Engine/VM instances page, using hamburger menu.
+
+1. The for bastion host, click SSH button to open an SSH session.
 
 ## Install Prerequisites and Cloud CLIs
 
@@ -66,27 +122,14 @@ source ~/.profile
 ?. __GCP:__ For Qwiklabs/CloudShell:
 
 ```sh
-## for operator
-# TODO: [] move to bastion 
-gcloud auth login --quiet
-
+# populate variables as appropriate or 
 # use those pre-canned commands if you're using qwiklabs
 export PROJECT=$(gcloud projects list|grep qwiklabs-gcp|awk '{print $1}')
-export GCP_OS_USERNAME=$(gcloud config get-value account | awk -F@ '{print $1}' ) 
-
-
-# otherwise, insert values:
-export PROJECT=
-export GCP_OS_USERNAME=
-
-# gcp login for for scripts:
-gcloud auth application-default login --quiet
+# export GCP_OS_USERNAME=$(gcloud config get-value account | awk -F@ '{print $1}' ) 
+export GCP_OS_USERNAME=$USER
 ```
 
-
-?. AWS
-
-?. for a current session
+?. __AWS:__ for a current session
 
 ```sh
 export AWS_ACCESS_KEY_ID=<access-key>
@@ -95,7 +138,7 @@ export AWS_REGION=us-east-1
 export AWS_PAGER=
 ```
 
-?. Define AWS user-wide credencials file
+?. Define AWS user-wide credentials file
 
 ```sh
 mkdir ~/.aws
@@ -143,13 +186,12 @@ After the install finished, you can use provisioned jumpboxes and suggested comm
 
 ```sh
 # to define jumpboxes IP address
-pushd infra-cluster-az-tf
+pushd infra-gcp-aws-az-tf
 source <(terraform output |awk '{printf( "export %s=%s\n", toupper($1), $3)}')
 popd
 
-gcloud compute config-ssh
+gcloud compute config-ssh --ssh-key-file ~/.ssh/id_gcp
 gcloud compute ssh vm-gcp --ssh-key-file ~/.ssh/id_gcp --zone europe-west1-b
-
 
 ssh $USER@$GCP_JUMPBOX_IP -i ~/.ssh/id_gcp
 ssh ec2-user@$AWS_JUMPBOX_IP -i ~/.ssh/id_aws
@@ -163,6 +205,41 @@ hostname -i
 
 while true ; do  echo -e "HTTP/1.1 200 OK\n\n $(date)" | nc -l -p 7001  ; done
 ```
+
+# Multi-cloud connectivity check between Kubernetes containers
+
+For connectivity check use following commands:
+```
+# source R#_CLUSTER variables
+export AHR_HOME=~/ahr
+export HYBRID_HOME=~/apigee-hybrid-multicloud
+source $HYBRID_HOME/mc-hybrid-common.env
+
+# gke
+kubectl --context $R1_CLUSTER run -i --tty busybox --image=busybox --restart=Never -- sh
+
+# eks
+kubectl --context $R2_CLUSTER run -i --tty busybox --image=busybox --restart=Never -- sh
+
+# aks
+kubectl --context $R3_CLUSTER run -i --tty busybox --image=busybox --restart=Never -- sh
+
+
+#
+hostname -i
+
+# nc-based server
+while true ; do  echo -e "HTTP/1.1 200 OK\n\n $(date)" | nc -l -p 7001  ; done
+
+# nc client
+nc -v 10.4.0.76 7001
+
+# delete busybox containers
+kubectl --context $R1_CLUSTER delete pod busybox
+kubectl --context $R2_CLUSTER delete pod busybox
+kubectl --context $R3_CLUSTER delete pod busybox
+```
+
 
 
 ## Remove resources
