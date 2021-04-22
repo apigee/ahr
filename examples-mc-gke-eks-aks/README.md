@@ -27,7 +27,7 @@ We are going to:
 
 ```sh
 export PROJECT=<your-project-id>
-export BASION_ZONE=europe-west1-b
+export BASTION_ZONE=europe-west1-b
 ```
 
 1. Create a service account for installation purposes.
@@ -60,7 +60,7 @@ done
 ```sh
 gcloud compute instances create bastion \
     --service-account "$INSTALLER_SA_ID@$PROJECT.iam.gserviceaccount.com" \
-    --zone $BASION_ZONE \
+    --zone $BASTION_ZONE \
     --scopes cloud-platform
 ```
 
@@ -104,7 +104,6 @@ cp -R $AHR_HOME/examples-mc-gke-eks-aks/. $HYBRID_HOME
 ?. CLIs
 
 ```sh
-cd $HYBRID_HOME
 
 sudo apt-get install kubectl
 
@@ -176,7 +175,10 @@ az account show
 
 ```
 cd $HYBRID_HOME
-./install-apigee-hybrid-gke-eks-aws.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
+
+cp -R $AHR_HOME/examples-mc-gke-eks-aks/. $HYBRID_HOME
+
+./install-apigee-hybrid-gke-eks-aks.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
 ``` 
 
 
@@ -240,6 +242,22 @@ kubectl --context $R2_CLUSTER delete pod busybox
 kubectl --context $R3_CLUSTER delete pod busybox
 ```
 
+# Cassandra Replication Walkthrough
+
+```
+# for each cluster: 1, 2, 3
+kubectl --context $R1_CLUSTER run -i --tty --restart=Never --rm --image google/apigee-hybrid-cassandra-client:1.0.0 cqlsh
+
+# at the shell, execute cqlsh and enter password, default: iloveapis123
+cqlsh apigee-cassandra-default-0.apigee-cassandra-default.apigee.svc.cluster.local -u ddl_user --ssl
+
+describe tables;
+
+# WARNING: Replace my organization name with your organization name with dashes replaced with underscores!!
+
+select * from kms_qwiklabs_gcp_03_d1330351146a_hybrid.developer;
+
+```
 
 
 ## Remove resources
