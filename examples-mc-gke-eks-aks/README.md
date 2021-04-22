@@ -4,6 +4,9 @@ This terraform project allows you to install non-default networking on either GC
 
 Of course, you need an active account at each of the two or three clouds.
 
+__NOTE:__ To install GKE/EKS, follow the same sequence of install step and skip actions/operations marked as Azure only.
+
+
 ## Terminal
 
  Use your working computer terminal or a VM  to overcome the timeout limit of CloudShell. We recommend to provision a default VM in your GCP project.
@@ -100,15 +103,22 @@ mkdir -p $HYBRID_HOME
 cp -R $AHR_HOME/examples-mc-gke-eks-aks/. $HYBRID_HOME
 ```
 
+?. Install `kubectl` if it is absent
+
+```
+sudo apt-get install kubectl
+```
+
 
 ?. CLIs
 
 ```sh
-
-sudo apt-get install kubectl
+cd $HYBRID_HOME
 
 ./cli-terraform.sh
 ./cli-aws.sh
+
+# skip for gke/eks install
 ./cli-az.sh
 
 $AHR_HOME/bin/ahr-verify-ctl prereqs-install-yq
@@ -151,7 +161,7 @@ region = $AWS_REGION
 EOF
 ```
 
-?. Azure
+?. Azure  [skip for gke/eks install]
 
 ```sh
 az login
@@ -164,22 +174,44 @@ gcloud compute instances list
 echo "Check if logged in aws: "
 aws sts get-caller-identity
 
-echo "Check if logged in az: "
+echo "Check if logged in az: " [skip for gke/eks install]
 az account show
 ```
 
 
-# Install Apigee Hybrid Multi-cloud
+# Install Apigee Hybrid Multi-cloud: GKE/EKS/AKS
 
 **WARNING:** Install takes around 40 minutes. If you are using Cloud Shell (which by design is meant for an interactive work only), make sure you keep your install session alive, as CloudShell has  an inactivity timeout. For details, see: https://cloud.google.com/shell/docs/limitations#usage_limits
 
 ```
-cd $HYBRID_HOME
-
-cp -R $AHR_HOME/examples-mc-gke-eks-aks/. $HYBRID_HOME
-
 ./install-apigee-hybrid-gke-eks-aks.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
 ``` 
+
+
+# Install Apigee Hybrid Multi-cloud: GKE/EKS
+
+```
+./install-apigee-hybrid-gke-eks.sh |& tee mc-install-`date -u +"%Y-%m-%dT%H:%M:%SZ"`.log
+``` 
+
+## Send Test Proxy Reqest from jumpbox
+
+We deliberated created hybrid istio ingress as Internal Load Balacers in each environment with an intention to set up a Global Load Balancer in front of them.
+
+We also provisioned three jumpboxes in each VPC to be able to troubleshoot clusters and send test requests.
+
+?. At the bastion host, source an environment
+
+```
+source $HYBRID_HOME/source.env
+```
+
+?. Execute echo command to resolve values of environement variables
+```
+echo curl --cacert $RUNTIME_SSL_CERT https://$RUNTIME_HOS
+T_ALIAS/ping -v --resolve "$RUNTIME_HOST_ALIAS:443:$RUNTIME_IP" --http1.1
+```
+?. At the vm-gcp jumpbox, copy the curl request from the previous command output; either copy a certificate file or add -k to the curl request. Execute it.
 
 
 ### Validate connectivity
@@ -197,6 +229,7 @@ gcloud compute ssh vm-gcp --ssh-key-file ~/.ssh/id_gcp --zone europe-west1-b
 
 ssh $USER@$GCP_JUMPBOX_IP -i ~/.ssh/id_gcp
 ssh ec2-user@$AWS_JUMPBOX_IP -i ~/.ssh/id_aws
+# skip for aks intall
 ssh azureuser@$AZ_JUMPBOX_IP -i ~/.ssh/id_az
 
 
