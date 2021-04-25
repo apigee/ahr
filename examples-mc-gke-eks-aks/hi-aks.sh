@@ -41,7 +41,7 @@ spec:
 EOF
 
 # as we are configuring internal lb, expose status-port for health-checks
-yq write -i -s - $HYBRID_HOME/istio-operator-gke-template.yaml <<"EOF"
+yq write -i -s - $HYBRID_HOME/istio-operator-aks-template.yaml <<"EOF"
 - command: update
   path: spec.components.ingressGateways.(name==istio-ingressgateway).k8s.service.ports[+]
   value:

@@ -45,7 +45,7 @@ yq delete -i $HYBRID_HOME/istio-operator-eks-template.yaml '**.k8s.service.loadB
 yq delete -i $HYBRID_HOME/istio-operator-eks-template.yaml '**.k8s.service.ports[0]'
 
 # as we are configuring internal lb, expose status-port for health-checks
-yq write -i -s - $HYBRID_HOME/istio-operator-gke-template.yaml <<"EOF"
+yq write -i -s - $HYBRID_HOME/istio-operator-eks-template.yaml <<"EOF"
 - command: update
   path: spec.components.ingressGateways.(name==istio-ingressgateway).k8s.service.ports[+]
   value:
