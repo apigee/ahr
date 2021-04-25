@@ -40,6 +40,17 @@ spec:
             service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 EOF
 
+# as we are configuring internal lb, expose status-port for health-checks
+yq write -i -s - $HYBRID_HOME/istio-operator-gke-template.yaml <<"EOF"
+- command: update
+  path: spec.components.ingressGateways.(name==istio-ingressgateway).k8s.service.ports[+]
+  value:
+      name: status-port
+      port: 15021
+      protocol: TCP
+      targetPort: 15021
+EOF
+
 yq delete -i $HYBRID_HOME/istio-operator-aks-template.yaml '**.k8s.service.loadBalancerIP'
 
 ahr-cluster-ctl template $HYBRID_HOME/istio-operator-aks-template.yaml > $ASM_CONFIG

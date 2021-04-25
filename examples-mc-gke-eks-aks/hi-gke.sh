@@ -46,6 +46,17 @@ spec:
             networking.gke.io/internal-load-balancer-allow-global-access: "true"
 EOF
 
+# as we are configuring internal lb, expose status-port for health-checks
+yq write -i -s - $HYBRID_HOME/istio-operator-gke-template.yaml <<"EOF"
+- command: update
+  path: spec.components.ingressGateways.(name==istio-ingressgateway).k8s.service.ports[+]
+  value:
+      name: status-port
+      port: 15021
+      protocol: TCP
+      targetPort: 15021
+EOF
+
 ahr-cluster-ctl template $HYBRID_HOME/istio-operator-gke-template.yaml > $ASM_CONFIG
 
 # Get ASM and add _HOME to PATH

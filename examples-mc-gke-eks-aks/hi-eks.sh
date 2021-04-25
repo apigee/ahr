@@ -44,7 +44,16 @@ yq delete -i $HYBRID_HOME/istio-operator-eks-template.yaml '**.k8s.service.loadB
 # we know it's an array element 0
 yq delete -i $HYBRID_HOME/istio-operator-eks-template.yaml '**.k8s.service.ports[0]'
 
-
+# as we are configuring internal lb, expose status-port for health-checks
+yq write -i -s - $HYBRID_HOME/istio-operator-gke-template.yaml <<"EOF"
+- command: update
+  path: spec.components.ingressGateways.(name==istio-ingressgateway).k8s.service.ports[+]
+  value:
+      name: status-port
+      port: 15021
+      protocol: TCP
+      targetPort: 15021
+EOF
 
 ahr-cluster-ctl template $HYBRID_HOME/istio-operator-eks-template.yaml > $ASM_CONFIG
 
