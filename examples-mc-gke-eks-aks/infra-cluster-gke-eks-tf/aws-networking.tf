@@ -1,20 +1,20 @@
 
 data "aws_vpc" "aws_vpc" {
   tags = {
-    Name = "${var.aws_vpc}"
+    Name = var.aws_vpc
   }
 }
 data "aws_subnet" "aws_public_subnet" {
 
   tags = {
-    Name = "${var.aws_public_subnet}"
+    Name = var.aws_public_subnet
   }
 }
 
 data "aws_vpn_gateway" "aws_vpn_gw" {
   attached_vpc_id = data.aws_vpc.aws_vpc.id
   tags = {
-    Name = "${var.aws_vpn_gw_name}"
+    Name = var.aws_vpn_gw_name
   }
 }
 
@@ -46,20 +46,25 @@ resource "aws_nat_gateway" "nat_gw" {
 resource "aws_route_table" "rtb_private_subnet" {
   vpc_id = data.aws_vpc.aws_vpc.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_nat_gateway.nat_gw.id
-  }
-
-  route {
-    cidr_block = var.gcp_vpc_cidr
-    gateway_id = data.aws_vpn_gateway.aws_vpn_gw.id
-  }
-
   tags = {
     Name = "rtb-private-subnet"
   }
 }
+
+resource "aws_route" "aws_nat_gw_route" {
+  route_table_id = aws_route_table.rtb_private_subnet.id
+
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id = aws_nat_gateway.nat_gw.id
+}
+
+resource "aws_route" "aws_gcp_vpc_route" {
+  route_table_id = aws_route_table.rtb_private_subnet.id
+
+  destination_cidr_block = var.gcp_vpc_cidr
+  gateway_id = data.aws_vpn_gateway.aws_vpn_gw.id
+}
+
 
 
 # private subnets for private EKS cluster
