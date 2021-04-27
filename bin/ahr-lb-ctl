@@ -22,7 +22,7 @@ function show_help(){
 
     echo "Set of operations to control popular preconfigured GTM Configurations."
     echo ""
-    echo " ahr-lb-ctl create-proxy-mig|create-xlb|create-external-ip|check-ssl-status|configure-backend|create-gxlb|deploy-start-script-to-gcs"
+    echo " ahr-lb-ctl create-proxy-mig|create-xlb|create-external-ip|check-ssl-status|create-backend|create-gxlb|deploy-start-script-to-gcs"
     echo ""
     echo "Examples:"
     echo ""
@@ -63,99 +63,132 @@ eval set -- "$pps"
 ACTION="$1"
 
 #-----------------------------------------------------------------------
-# TODO: [ ] pre-1.3.x version; migrate to get-apigeectl
 if [ "create-proxy-mig" == "$ACTION" ]; then
 
-XXXX
-# TODO: [ ] create a firewall rule with tag "healthcheck" for port 15021 (/healthz/ready)
+    check_envvars "PROJECT REGION NETWORK SUBNET APIGEE_ENDPOINT MIG"
+    check_envvars "PROXY_BUCKET PROXY_SCRIPT PROXY_MACHINE_TYPE PROXY_MIG_MIN_SIZE PROXY_MIG_MAX_SIZE"
 
-gcloud compute instance-templates create "$MIG" \
-  --region "$REGION" --network "$NETWORK" \
+echo "INFO: Proxy MIG Template: Create Instance Template"
+## TODO: [ ] verify --no-address
+gcloud compute instance-templates create $MIG-template \
+  --region "$REGION" \
+  --network "$NETWORK" \
   --subnet "$SUBNET" \
-  --no-address \
-  --tags=https-server,healthcheck,apigee-network-proxy,gke-apigee-proxy \
+  --tags=https-server,gke-apigee-proxy-healthcheck \
   --machine-type "$PROXY_MACHINE_TYPE" \
   --image-family centos-7 \
   --image-project centos-cloud --boot-disk-size 20GB \
-  --metadata ENDPOINT="$APIGEE_ENDPOINT",startup-script-url=gs://apigee-5g-saas/apigee-envoy-proxy-release/latest/conf/startup-script.sh --project "$PROJECT"
+  --metadata ENDPOINT="$APIGEE_ENDPOINT",startup-script-url=$PROXY_BUCKET/$PROXY_SCRIPT \
+  --project "$PROJECT"
 
-echo "Step 7c.2: Create a managed instance group"
+echo "INFO: Proxy MIG: Create a managed instance group"
 gcloud compute instance-groups managed create "$MIG" \
   --base-instance-name apigee-proxy \
-  --size "$PROXY_MIG_MIN_SIZE" --template "$MIG" --region "$REGION" --project "$PROJECT"
+  --size "$PROXY_MIG_MIN_SIZE" \
+  --template $MIG-template \
+  --region "$REGION" \
+  --project "$PROJECT"
 
-echo "Step 7c.3: Configure autoscaling for the group"
+echo "INFO: Proxy MIG: Configure autoscaling for the group"
 gcloud compute instance-groups managed set-autoscaling "$MIG" \
-  --region "$REGION" --max-num-replicas 5 \
-  --target-cpu-utilization 0.75 --cool-down-period 90 --project "$PROJECT"
+  --region "$REGION" \
+  --max-num-replicas $PROXY_MIG_MAX_SIZE \
+  --target-cpu-utilization 0.75 \
+  --cool-down-period 90 \
+  --project "$PROJECT"
 
-echo "Step 7c.4: Defined a named port"
-
+echo "INFO: Proxy MIG: Defined a named port"
 gcloud compute instance-groups managed set-named-ports "$MIG" \
-  --region "$REGION" --named-ports https:443 --project "$PROJECT"
+  --region "$REGION" \
+  --named-ports https:443,status-check:15021 \
+  --project "$PROJECT"
+
+
 
 
 #-----------------------------------------------------------------------
 elif [ "create-external-ip" == "$ACTION" ]; then
 
-    pass
 
 
-echo "Step 7d.1: Reserve an IP address for the Load Balancer"
+### TODO: Refactor: might not belong here: too inflexible
+
+
+echo "INFO: External IP: Reserve an IP address for the Load Balancer"
 gcloud compute addresses create lb-ipv4-vip-1 --ip-version=IPV4 --global --project "$PROJECT"
 
-echo "Step 7d.2: Get a reserved IP address"
+echo "INFO: External IP: Get a reserved IP address"
+export RUNTIME_IP=$(gcloud compute addresses describe lb-ipv4-vip-1 --format="get(address)" --global --project "$PROJECT")
 
-RUNTIME_IP=$(gcloud compute addresses describe lb-ipv4-vip-1 --format="get(address)" --global --project "$PROJECT")
-export RUNTIME_IP
+# Example: FQDN= 34-117-145-185.nip.io
+export RUNTIME_HOST_ALIAS=$(echo "$RUNTIME_IP" | tr '.' '-').nip.io
 
-RUNTIME_IP=34.117.145.185
+echo "INFO: Host Alias: $RUNTIME_HOST_ALIAS"
 
-
-FQDN= 34-117-145-185.nip.io
-
-RUNTIME_HOST_ALIAS=$(echo "$RUNTIME_IP" | tr '.' '-').nip.io
-
-echo $RUNTIME_HOST_ALIAS
-
+echo "INFO: External IP: Create Google Managed SSL Certificate"
 gcloud compute ssl-certificates create apigee-ssl-cert \
     --domains="$RUNTIME_HOST_ALIAS" --project "$PROJECT"
 
-XXXXX
-TODO: [ ] add the FQDN to the envgroup definition in the org
 
 #-----------------------------------------------------------------------
 elif [ "check-ssl-status" == "$ACTION" ]; then
 
-    pass
-
-gcloud beta compute ssl-certificates describe nipsslcertificate \
+gcloud beta compute ssl-certificates describe apigee-ssl-cert \
     --global \
     --format="get(managed.domainStatus,managed.status)"
 
 
 #-----------------------------------------------------------------------
-elif [ "configure-backend" == "$ACTION" ]; then
+elif [ "create-backend" == "$ACTION" ]; then
 
 
-echo "Step 7f.1: Create a health check"
+echo "INFO: Backend: Create a firewall rule for default-allow-https"
+gcloud compute firewall-rules create default-allow-https \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=$NETWORK \
+  --action=ALLOW \
+  --rules=tcp:443 \
+  --source-ranges=0.0.0.0/0 \
+  --target-tags=https-server \
+  --project=$PROJECT  || echo "Failed to create - ignoring assuming it already exists"
+
+echo "INFO: Backend: Create a firewall rule that lets the Load Balancer access Proxy VM"
+gcloud compute firewall-rules create k8s-allow-lb-to-apigee-proxy-healthcheck \
+    --description "Allow incoming from GLB on TCP port 15021 to Apigee Proxy" \
+    --network "$NETWORK" \
+    --allow=tcp:15021 \
+    --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+    --target-tags=gke-apigee-proxy-healthcheck \
+    --project "$PROJECT" || echo "Failed to create - ignoring assuming it already exists"
+
+echo "INFO: Backend: Create a health check"
 gcloud compute health-checks create http hc-apigee-proxy-15021 \
   --port 15021 --global \
   --request-path /healthz/ready --project "$PROJECT"
 
 
-echo "Step 7f.2: Create a backend service called 'apigee-proxy-backend'"
 
+echo "INFO: Backend: Create a backend service called 'apigee-proxy-backend'"
 gcloud compute backend-services create apigee-proxy-backend \
-  --protocol HTTPS --health-checks hc-apigee-proxy-15021 \
-  --port-name https --timeout 60s --connection-draining-timeout 300s --global --project "$PROJECT"
+  --protocol HTTPS \
+  --health-checks hc-apigee-proxy-15021 \
+  --port-name https \
+  --timeout 60s \
+  --connection-draining-timeout 300s \
+  --global \
+  --project "$PROJECT"
 
-echo "Step 7f.3: Add the Load Balancer Proxy VM instance group to your backend service"
+
+#-----------------------------------------------------------------------
+elif [ "add-backend" == "$ACTION" ]; then
+
+
+echo "INFO: Host Alias: Add the Load Balancer Proxy VM instance group to your backend service"
 gcloud compute backend-services add-backend apigee-proxy-backend \
   --instance-group "$MIG" \
   --instance-group-region "$REGION" \
   --balancing-mode UTILIZATION --max-utilization 0.8 --global --project "$PROJECT"
-
 
 
 #-----------------------------------------------------------------------
@@ -181,13 +214,27 @@ gcloud compute forwarding-rules create apigee-proxy-https-lb-rule \
 
 #-----------------------------------------------------------------------
 elif [ "deploy-start-script-to-gcs" == "$ACTION" ]; then
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: No proxy script bucket or proxy startup script is provided."
+        echo "I.E.:"
+        echo " ahr-lb-ctl deploy-start-script-to-gcs $PROXY_BUCKET $PROXY_SCRIPT"
+        echo ""
+        show_help
+        exit 5
+    fi
 
-    check_envvars "PROXY_SCRIPT REGION"
+    PROXY_BUCKET=$2
+    PROXY_SCRIPT=$3
+
+    check_envvars "PROJECT PROXY_BUCKET PROXY_SCRIPT REGION"
     check_commands "gsutil"
 
-    gsutil ls -b gs://apigee-mig-proxy || gsutil mb -l $REGION gs://apigee-mig-proxy
+    gsutil ls -b $PROXY_BUCKET || gsutil mb -l $REGION $PROXY_BUCKET
 
-    gsutil cp $PROXY_SCRIPT gs://apigee-mig-proxy
+    gsutil cp $PROXY_SCRIPT $PROXY_BUCKET
+
+    COMPUTE_SA=$(gcloud projects describe $PROJECT --format="value(projectNumber)")-compute@developer.gserviceaccount.com
+    gsutil acl ch -u $COMPUTE_SA:R $PROXY_BUCKET/$PROXY_SCRIPT
 
 
 #-----------------------------------------------------------------------
