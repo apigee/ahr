@@ -115,10 +115,10 @@ elif [ "create-external-ip" == "$ACTION" ]; then
 
 
 echo "INFO: External IP: Reserve an IP address for the Load Balancer"
-gcloud compute addresses create lb-ipv4-vip-1 --ip-version=IPV4 --global --project "$PROJECT"
+gcloud compute addresses create vip-address --ip-version=IPV4 --global --project "$PROJECT"
 
 echo "INFO: External IP: Get a reserved IP address"
-export RUNTIME_IP=$(gcloud compute addresses describe lb-ipv4-vip-1 --format="get(address)" --global --project "$PROJECT")
+export RUNTIME_IP=$(gcloud compute addresses describe vip-address --format="get(address)" --global --project "$PROJECT")
 
 # Example: FQDN= 34-117-145-185.nip.io
 export RUNTIME_HOST_ALIAS=$(echo "$RUNTIME_IP" | tr '.' '-').nip.io
@@ -192,21 +192,22 @@ gcloud compute backend-services add-backend apigee-proxy-backend \
 
 
 #-----------------------------------------------------------------------
-elif [ "create-gxlb" == "$ACTION" ]; then
+elif [ "create-glb" == "$ACTION" ]; then
 
 
-echo "INFO: GXLB: Create a Load Balancing URL map"
-gcloud compute url-maps create apigee-proxy-map \
-  --default-service apigee-proxy-backend --project "$PROJECT"
+echo "INFO: GLB: Create a Load Balancing URL map"
+gcloud compute url-maps create apigee-proxy-lb \
+  --default-service apigee-proxy-backend \
+  --project "$PROJECT"
 
-echo "INFO: GXLB: Create a Load Balancing target HTTPS proxy"
+echo "INFO: GLB: Create a Load Balancing target HTTPS proxy"
 gcloud compute target-https-proxies create apigee-proxy-https-proxy \
   --url-map apigee-proxy-map \
   --ssl-certificates apigee-ssl-cert --project "$PROJECT"
 
-echo "INFO: GXLB: Create a global forwarding rule"
+echo "INFO: GLB: Create a global forwarding rule"
 gcloud compute forwarding-rules create apigee-proxy-https-lb-rule \
-  --address lb-ipv4-vip-1 --global \
+  --address vip-address --global \
   --target-https-proxy apigee-proxy-https-proxy --ports 443 --project "$PROJECT"
 
 
@@ -214,24 +215,28 @@ gcloud compute forwarding-rules create apigee-proxy-https-lb-rule \
 
 #-----------------------------------------------------------------------
 elif [ "deploy-start-script-to-gcs" == "$ACTION" ]; then
-    if [ "$#" -lt 3 ]; then
-        echo "ERROR: No proxy script bucket or proxy startup script is provided."
+    if [ "$#" -lt 4 ]; then
+        echo "ERROR: No proxy script bucket or proxy script local path or proxy startup script is provided."
         echo "I.E.:"
-        echo " ahr-lb-ctl deploy-start-script-to-gcs $PROXY_BUCKET $PROXY_SCRIPT"
+        echo " ahr-lb-ctl deploy-start-script-to-gcs $PROXY_BUCKET $PROXY_SCRIPT_LPATH $PROXY_SCRIPT"
         echo ""
         show_help
         exit 5
     fi
 
     PROXY_BUCKET=$2
-    PROXY_SCRIPT=$3
+    PROXY_SCRIPT_LPATH=$3
+    PROXY_SCRIPT=$4
 
     check_envvars "PROJECT PROXY_BUCKET PROXY_SCRIPT REGION"
     check_commands "gsutil"
 
     gsutil ls -b $PROXY_BUCKET || gsutil mb -l $REGION $PROXY_BUCKET
 
+    (
+    cd $PROXY_SCRIPT_LPATH
     gsutil cp $PROXY_SCRIPT $PROXY_BUCKET
+    )
 
     COMPUTE_SA=$(gcloud projects describe $PROJECT --format="value(projectNumber)")-compute@developer.gserviceaccount.com
     gsutil acl ch -u $COMPUTE_SA:R $PROXY_BUCKET/$PROXY_SCRIPT
