@@ -46,7 +46,6 @@ REQUIRED_APIS1=" \
     cloudresourcemanager.googleapis.com \
     cloudtrace.googleapis.com \
     compute.googleapis.com \
-    computescanning.googleapis.com \
     container.googleapis.com \
     containeranalysis.googleapis.com \
     containerregistry.googleapis.com \
