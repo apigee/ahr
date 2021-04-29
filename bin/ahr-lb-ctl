@@ -83,7 +83,7 @@ gcloud compute instance-templates create $MIG-template \
 
 echo "INFO: Proxy MIG: Create a managed instance group"
 gcloud compute instance-groups managed create "$MIG" \
-  --base-instance-name apigee-proxy \
+  --base-instance-name $MIG \
   --size "$PROXY_MIG_MIN_SIZE" \
   --template $MIG-template \
   --region "$REGION" \
