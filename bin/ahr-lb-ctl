@@ -196,13 +196,13 @@ elif [ "create-glb" == "$ACTION" ]; then
 
 
 echo "INFO: GLB: Create a Load Balancing URL map"
-gcloud compute url-maps create apigee-proxy-lb \
+gcloud compute url-maps create apigee-proxy-glb \
   --default-service apigee-proxy-backend \
   --project "$PROJECT"
 
 echo "INFO: GLB: Create a Load Balancing target HTTPS proxy"
 gcloud compute target-https-proxies create apigee-proxy-https-proxy \
-  --url-map apigee-proxy-map \
+  --url-map apigee-proxy-glb \
   --ssl-certificates apigee-ssl-cert --project "$PROJECT"
 
 echo "INFO: GLB: Create a global forwarding rule"

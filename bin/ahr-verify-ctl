@@ -17,6 +17,8 @@
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 . $BASEDIR/ahr-lib.sh
 
+set -e
+
 function show_help(){
 
     echo "Set of operations to control Hybrid install and runtime configuration."
