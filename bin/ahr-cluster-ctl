@@ -396,7 +396,7 @@ Anthos user as KSA in your cluster is created
 
 To login into the EKS cluster, extact the token from a cluster secret using following commands:
 
-  CLUSTER_SECRET=$(kubectl get serviceaccount anthos-user -o jsonpath='{$.secrets[0].name}')
+  CLUSTER_SECRET=$(kubectl get serviceaccount anthos-user -o json | jq -r '.secrets[] | select(.name | test("anthos-user-token-")).name')
   kubectl get secret ${CLUSTER_SECRET} -o jsonpath='{$.data.token}' | base64 --decode
 
 EOF
