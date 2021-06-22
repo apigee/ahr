@@ -90,7 +90,6 @@
       "maxPodsPerNode": "110"
     },
     "authenticatorGroupsConfig": {},
-    "privateClusterConfig": {},
     "databaseEncryption": {
       "state": "DECRYPTED"
     },
