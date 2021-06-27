@@ -520,7 +520,7 @@ if [ "$action" = "create-sa" ]; then
        exit 1
     fi
 
-    # SA_PROFILES and SA_NAME are passed via options and are optional
+    # PROFILES and NAME are passed via options and are optional
     # for all, --suffix is checked
     if [ "$SA_IDS" = "all" ]; then
         SA_IDS="$APIGEE_SA_ALL"
@@ -529,11 +529,13 @@ if [ "$action" = "create-sa" ]; then
     # iterate through SA_ID list
     IFS=","
     for SA_ID in $SA_IDS; do
-        if [ "$PROFILES" = "" ]; then
-            PROFILES="$SA_ID"
+        if [ "$PROFILES" ]; then
+            sa_profiles="$PROFILES"
+        else
+            sa_profiles="$SA_ID"
         fi
 
-        create_sa "${PROJECT}" "$SA_ID$SUFFIX" "$PROFILES" "$NAME"
+        create_sa "${PROJECT}" "$SA_ID$SUFFIX" "$sa_profiles" "$NAME"
     done
 
 #---
@@ -653,13 +655,10 @@ elif [ "$action" = "view-sa" ]; then
     IFS=","
     for sa_id in $SA_IDS; do
 
-sa_exists $PROJECT $sa_id;
-echo ":::>>>>> $?"
-
         if sa_exists $PROJECT $sa_id ; then
             view_sa_by_id $PROJECT "$sa_id"
         else
-            echo "SA does not exist: sa_id"
+            echo "WARNING: SA does not exist: $sa_id"
         fi
     done
 
@@ -731,11 +730,13 @@ elif [ "$action" = "rebind-sa" ]; then
 
     IFS=","
     for SA_ID in $SA_IDS; do
-        if [ "$PROFILES" = "" ]; then
-           PROFILES="$SA_ID"
+        if [ "$PROFILES" ]; then
+            sa_profiles="$PROFILES"
+        else
+            sa_profiles="$SA_ID"
         fi
 
-        rebind_sa "$PROJECT" "$SA_ID" "$PROFILES"
+        rebind_sa "$PROJECT" "$SA_ID" "$sa_profiles"
     done
 
 #'---
@@ -751,7 +752,7 @@ elif [ "$action" = "delete-sa" ]; then
     fi
 
     if [ "$SA_IDS" = "all" ]; then
-        COMP="$APIGEE_COMP_ALL"
+        SA_IDS="$APIGEE_SA_ALL"
     fi
 
     IFS=","
