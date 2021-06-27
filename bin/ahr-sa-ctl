@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2020 Google LLC
+# Copyright 2020-2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,13 @@
 #    $1 ACTION create|delete|config
 #    $2 Role
 
+# TODO: [ ] refactor all commands to lists of sas and profiles
+# TODO: [ ] check for SA commands to work with suffixes
+# TODO: [ ] check if rebind is really needed
+# TODO: [ ] verify sa token: Apigee ORG verification: check
+# TODO: [ ] refactor help to sub-command helps
+# TODO: [ ] refactor help and auto-complete
+
 set -e
 
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -37,9 +44,37 @@ case "$1" in
     FORCE=Y
     shift;;
 
+  --profiles)
+    PROFILES=$2
+    shift 2;;
+
+  -s|--suffix)
+    SUFFIX=$2
+    shift 2;;
+
+  -n|--name)
+    NAME=$2
+    shift 2;;
+
+  --sa_dir)
+    SA_DIR=$2
+    shift 2;;
+
   -k|--force-key-file)
     FORCE_KEY_FILE=Y
+    shift;;
 
+  -y|--dry-run)
+    DRY_RUN=Y
+    shift;;
+
+  --filter)
+    FILTER="$2"
+    shift 2;;
+
+
+  -d|--debug)
+    DEBUG=Y
     shift;;
   *)
     pps="$pps $1"
@@ -55,8 +90,15 @@ eval set -- "$pps"
 #
 # https://cloud.google.com/iam/docs/understanding-roles#apigee-roles
 
-APIGEE_COMP_ALL="synchronizer,mart,udca,logger,metrics,watcher,cassandra"
-APIGEE_CONFIG_COMP_ALL="synchronizer,mart,udca"
+#
+# Profile processing euristics: 
+#  * if sa_id is found in profile, use this profile only
+#  * if sa_id is prefix of a profile name, use this profile
+#  * otherwise, use --profiles value
+#  * if --profiles is missing, report an error
+
+
+APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-distributed-trace"
 
 APIGEE_ASM_ROLES='roles/gkehub.connect'
 APIGEE_ASM_PERMS='"gkehub.endpoints.connect"'
@@ -90,25 +132,34 @@ APIGEE_CASSANDRA_ROLES='roles/storage.objectAdmin'
 APIGEE_CASSANDRA_PERMS='"resourcemanager.projects.get","resourcemanager.projects.list","storage.objects.*"'
 APIGEE_CASSANDRA_NAME='Cassandra Backups Service Account'
 
+APIGEE_DISTRIBUTED_TRACE_ROLES='roles/cloudtrace.agent'
+APIGEE_DISTRIBUTED_TRACE_PERMS='"cloudtrace.traces.patch"'
+APIGEE_DISTRIBUTED_TRACE_NAME='Distributed Trace Service Account'
+
 function show_help(){
 
     echo "Generate or remove collection of Apigee Hybrid Service Account roles"
     echo ""
     echo " ahr-sa-ctl create|config|delete|rebind \$PROJECT_ID"
     echo ""
-    echo " <comp> -- all or [comma-separated combination of] synchronizer,mart,udca,logger,metrics,cassandra"
+    echo " <sa-id> -- all or [comma-separated combination of] apigee-synchronizer,apigee-mart,apigee-watcher,apigee-udca,apigee-logger,apigee-metrics,apigee-cassandra,apigee-distributed-trace"
     echo ""
     echo ""
-    echo " ahr-sa-ctl create-sa all|<comp> [--force]"
-    
-#    echo " ahr-sa-ctl create-sa <comp> <comp-id> [--force]"
+    echo " ahr-sa-ctl create-sa all|<sa-id> [--force]"
 
-    echo " ahr-sa-ctl create-key all|<comp> [--force-key-file]"
+    echo " ahr-sa-ctl create-sa <sa-id> --role-profiles <role,role> [--force]"
+    echo "   "
+    echo "  --role-profiles is a comma-separated list of apigee profiles."
+    echo "   if absent, it defaults to the name of the sa-id"
+    echo ""
 
-    echo " ahr-sa-ctl config all|udca|synchronizer|mart <sa-id>"
-    echo "    ahr-sa-ctl config udca apigee-udca1"
-    echo " ahr-sa-ctl validate-key <comp> <key-json-file>"
-    echo " ahr-sa-ctl delete all|synchronizer|udca|mart|logger|metrics|cassandra"
+    echo " ahr-sa-ctl create-key all|<sa-id> [--force-key-file]"
+
+    echo " ahr-sa-ctl config all|apigee-udca|apigee-synchronizer|apigee-mart|apigee-watcher|apigee-cassandra <sa-id>"
+    echo "    ahr-sa-ctl config apigee-udca apigee-udca1"
+    echo " ahr-sa-ctl validate-key <sa-id> <key-json-file>"
+    echo " ahr-sa-ctl delete all|apigee-synchronizer|apigee-udca|apigee-mart|apigee-logger|apigee-metrics|apigee-watcher|apigee-cassandra|apigee-distributed-trace"
+    echo " ahr-sa-ctl sa-key-expires-at all|apigee-synchronizer|apigee-udca|apigee-mart|apigee-logger|apigee-metrics|apigee-watcher|apigee-cassandra|apigee-distributed-trace"
     echo ""
     echo "The key .json files will be generated in a current directory."
     echo "Utility relies on your current credentials being active for gcloud."
@@ -123,8 +174,19 @@ if [ "$#" -lt 1 ]; then
 fi
 
 action=$1
-sa_id=$2
-sa_name=$3
+
+
+
+function get(){
+    local sa_id=$1
+    local property=$2
+
+    local value=$(echo -n "${sa_id}${property}"|awk '{gsub(/-/, "_");print toupper($0)}')
+
+    echo "${!value}"
+}
+
+
 
 function get_sa_email() {
     local PROJECT=$1
@@ -134,18 +196,52 @@ function get_sa_email() {
 }
 
 
-#  process role
+function get_sa_key_properties() {
+    local KEY=$1
+
+    # get private key id
+    local SA_KEY_ID=$(echo "$KEY" | jq --raw-output .private_key_id)
+
+    # get client email
+    local SA_CLIENT_EMAIL=$(echo "$KEY" | jq --raw-output .client_email)
+
+    local SA_ID="${SA_CLIENT_EMAIL%%@*}"
+
+    # get expiry date
+    local EXPIRES_AT=$(gcloud iam service-accounts keys list  --iam-account $SA_CLIENT_EMAIL --format='table[no-heading](EXPIRES_AT)' --filter="KEY_ID:$SA_KEY_ID")
+
+    let DTE=(`date +%s -d "$EXPIRES_AT"`-`date +%s`)/86400 # Days To Expiry
+
+    echo "$SA_CLIENT_EMAIL" "$SA_ID" "$SA_KEY_ID" "$EXPIRES_AT" "$DTE"
+}
+
+
+
+
+# SA_ID:  process role(s)
+# SA_ID name of the SA
+# SA_PROFILES roles to add
 function create_sa() {
     local PROJECT=$1
-    local COMP=$2
+    local SA_ID=$2
+    local SA_PROFILES=$3
+    local SA_NAME=$4
 
-    local SA_ID=$3
-    if [ "$SA_ID" = "" ]; then
-        SA_ID=apigee-$COMP
+    if [ "$SA_PROFILES" = "" ]; then
+       SA_PROFILES="$SA_ID"
+    fi
+    if [ "$SA_NAME" = "" ]; then
+        local NAMES=""
+        for profile in $SA_PROFILES; do
+            if [ "$NAMES" = "" ]; then
+                NAMES="$(get $profile "_NAME")"
+            else
+                NAMES="$NAMES; $(get $profile "_NAME")"
+            fi
+        done
+        SA_NAME="$NAMES"
     fi
 
-    local SA_NAME=$(get $COMP "_NAME")
-    local SA_ROLE=$(get $COMP "_ROLES")
 
     local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
 
@@ -159,25 +255,24 @@ function create_sa() {
 set +e
     gcloud iam service-accounts create ${SA_ID} --display-name "${SA_NAME}"
 
-    if [ "$SA_ROLE" != "" ]; then
-        gcloud projects add-iam-policy-binding ${PROJECT} --member serviceAccount:$SA_EMAIL --role ${SA_ROLE} > /dev/null
-    fi
+    for profile in $SA_PROFILES; do
+        local SA_ROLE=$(get $profile "_ROLES")
+
+        if [ "$SA_ROLE" != "" ]; then
+            echo "    Binding serviceAccount:$SA_EMAIL to role: $SA_ROLE"
+            gcloud projects add-iam-policy-binding ${PROJECT} --member serviceAccount:$SA_EMAIL --role ${SA_ROLE} > /dev/null
+        fi
+    done
 set -e
 }
 
 function create_key() {
 
     local PROJECT=$1
-    local COMP=$2
-
-    local SA_ID=$3
-    if [ "$SA_ID" = "" ]; then
-        SA_ID=apigee-$COMP
-    fi
+    local SA_ID=$2
+    local FORCE_KEY_FILE=$3
 
     local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
-
-
     local SA_KEY_JSON=${SA_DIR}/${PROJECT}-${SA_ID}.json
 
     # generate key json; 
@@ -186,32 +281,31 @@ function create_key() {
     if [ ! -f "$SA_KEY_JSON" ] || [ "$FORCE_KEY_FILE" = "Y" ]; then
         gcloud iam service-accounts keys create ${SA_KEY_JSON} --iam-account $SA_EMAIL
     else
-        echo "JSON file exists: $SA_KEY_JSON. Skipping."
+        echo "ERROR: JSON file exists: $SA_KEY_JSON. Skipping. Use --force-key-file to override"
     fi
 }
 
 
-function get(){
-    local comp=$1
-    local property=$2
+function sa_exists(){
+    local PROJECT="$1"
+    local SA_ID="$2"
 
-    local value=$(echo -n "apigee-${comp}${property}"|awk '{gsub(/-/, "_");print toupper($0)}')
-
-    echo "${!value}"
+    local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
+set +e
+    gcloud iam service-accounts describe $SA_EMAIL >/dev/null 2>&1
 }
 
 
-#"
-function config_sa() {
+#
+function view_sa() {
     local PROJECT=$1
-    local COMP=$2
-    local SA_ID=$3
+    local SA_ID=$2
 
-    local SA_EMAIL=$4
-    local SA_KEY_JSON=$5
+    local SA_EMAIL=$3
+    local SA_KEY_JSON=$4
 
 
-    local SA_PERMISSIONS="$(get $COMP '_PERMS')"
+    local SA_PERMISSIONS="$(get $SA_ID '_PERMS')"
 
     echo "Service Account: $SA_EMAIL"
 
@@ -234,7 +328,7 @@ if [ $( grep -c error <<< "$response" ) -ne 0  ]; then
     exit 1
 fi
 
-    if [[ ! ";mart;metrics;" =~ ";$COMP;" ]]; then
+    if [[ ! ";apigee-logger;apigee-mart;apigee-metrics;" =~ ";$SA_ID;" ]]; then
 
        echo "Apigee Hybrid Org/Env Permission:"
        response=$(curl --silent -X POST -H "Authorization: Bearer $satoken" -H "Content-Type:application/json" https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV:testIamPermissions --data-binary @- <<EOF
@@ -253,38 +347,33 @@ fi
     fi
 
 }
-#"
-function config_sa_by_id(){
+#
+function view_sa_by_id(){
     local PROJECT=$1
-    local COMP=$2
-
-    local SA_ID=$3
-    if [ "$SA_ID" = "" ]; then
-        SA_ID=apigee-$COMP
-    fi
+    local SA_ID=$2
 
     local SA_EMAIL=$(get_sa_email "${PROJECT}" "${SA_ID}")
     local SA_KEY_JSON=${SA_DIR}/${PROJECT}-${SA_ID}.json
 
-    config_sa "$PROJECT" "$COMP" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
+    view_sa "$PROJECT" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
 }
 
 
 
 #
-function config_sa_by_key(){
+function view_sa_by_key_file(){
     local PROJECT=$1
 
-    local COMP=$2
+    local SA_ID=$2
 
     local SA_KEY_JSON=$3
 
     local SA_EMAIL=$(cat $SA_KEY_JSON|jq --raw-output .client_email)
 
-    local SA_ID=${SA_EMAIL%@*}
+    local SA_ID_CUST=${SA_EMAIL%@*}
 
 
-    config_sa "$PROJECT" "$COMP" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
+    view_sa "$PROJECT" "$SA_ID" "$SA_EMAIL" "$SA_KEY_JSON"
 }
 
 
@@ -293,29 +382,29 @@ function config_sa_by_key(){
 #
 function rebind_sa(){
     local PROJECT=$1
-    local COMP=$2
-    local SA_ID=$3
+    local SA_ID=$2
+    local SA_PROFILES=$3
 
     local SA_EMAIL="$(get_sa_email $PROJECT $SA_ID)"
 
     local SA_ROLE=$(get $COMP "_ROLES")
-set +e
-    gcloud projects remove-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
-set -e
-    gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
 
+    for profile in $SA_PROFILES; do
+        local SA_ROLE=$(get $profile "_ROLES")
+
+set +e
+        echo "    Removing Binding serviceAccount:$SA_EMAIL to role: $SA_ROLE"
+        gcloud projects remove-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE > /dev/null
+set -e
+        echo "    Removing Binding serviceAccount:$SA_EMAIL to role: $SA_ROLE"
+        gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE > /dev/null
+   done
 }
 
 
 function delete_sa() {
     local PROJECT=$1
-    local COMP=$2
-    local SA_ID=$3
-
-    if [ "$SA_ID" = "" ]; then
-        SA_ID=apigee-$COMP
-    fi
-
+    local SA_ID=$2
 
     local SA_EMAIL="$(get_sa_email $PROJECT $SA_ID)"
 
@@ -324,175 +413,536 @@ function delete_sa() {
 
     # Check if exists. If exists, delete it
     if [ "$(gcloud iam service-accounts list --format="value(name)" --filter="name:$SA_EMAIL" | wc -l)" -eq 1 ]; then
-# TODO: right now, it assumes one role 
-        local SA_ROLE=$(get $COMP "_ROLES")
-
-        set +e
-        gcloud projects remove-iam-policy-binding $PROJECT --member serviceAccount:$SA_EMAIL --role $SA_ROLE
-        set -e
 
         gcloud iam service-accounts delete $SA_EMAIL --quiet
 
-        rm -f $SA_KEY_JSON
+        # TODO: [ ] Should we really remove it?
+        # rm -f $SA_KEY_JSON
+    else
+        echo "ahr-sa-ctl: WARNING delete: SA doesn't exist $SA_ID"
     fi
 
 }
 
-#'
+
+#'-------------------
+
+function sa_keys_report() {
+    local CRD=$1
+    local A=$2
+    local SECRET_NAME=$3
+
+    local KEY=$(kubectl get secret -n apigee $SECRET_NAME -o json |  jq --raw-output '.data."client_secret.json"' | base64 -d)
+    if [ "$KEY" ]; then
+        read SA_EMAIL SA_ID SA_KEY_ID SA_KEY_EXPIRES_AT DTE < <(get_sa_key_properties "$KEY")
+
+        echo "$CRD $A $SECRET_NAME $SA_ID $SA_KEY_ID $DTE $SA_KEY_EXPIRES_AT"
+    else
+        echo "$CRD $A - - - - - - -"
+    fi
+}
+
+
+
+function sa_key_iterator() {
+
+   fiterator=$1
+   report="CRD AD/T SECRET_NAME SA_ID SA_KEY_ID DTE EXPIRES_AT"$'\n'
+
+# 1.4.x
+
+    #
+    # Iterate for all SA Key containing deployments
+    #
+
+    printf "Processing:"
+
+    # ORG SAs
+    for sa_id in apigee-connect-agent apigee-mart apigee-watcher; do
+        AD=$sa_id-$(get_org_env_sha "$ORG" "")
+        SECRET_NAME=$AD-svc-account
+
+        printf " AD/$sa_id"
+
+
+        report=$report$($fiterator "AD" "$AD" "$SECRET_NAME")$'\n'
+    done
+
+    # iterate on ENV SAs
+    for env in $(ahr-runtime-ctl env-list|jq -r '.[]'); do
+
+        for sa_id in apigee-synchronizer apigee-udca apigee-runtime; do
+            AD=$sa_id-$(get_org_env_sha "$ORG" "$env")
+            SECRET_NAME=$AD-svc-account
+
+            printf " AD/$sa_id"
+
+            if kubectl get secret -n apigee "$SECRET_NAME" > /dev/null 2>&1; then
+                report=$report$($fiterator "AD" "$AD" "$SECRET_NAME")$'\n'
+            else
+                report=$report"AD $AD - - - - -"$'\n'
+            fi
+        done
+   done
+
+    # TELEMETRY SAs
+    SECRET_NAME=apigee-metrics-svc
+    for AD in apigee-metrics-apigee-telemetry-app apigee-metrics-apigee-telemetry-proxy; do
+        printf " AD/$AD"
+
+        report=$report$($fiterator "AD" "$AD" "$SECRET_NAME")$'\n'
+    done
+
+    SECRET_NAME=apigee-logger-svc
+    for AT in apigee-telemetry; do # TODO: [ ] add logger
+        printf " AT/$AT"
+
+        report=$report$($fiterator "AT" "$AT" "$SECRET_NAME")$'\n'
+    done
+
+    printf "\n\n"
+    echo "$report" | column -t
+}
+
+#
+# all --suffix '-dev'
+#
+# apigee-mart             # defaults are populating roles and name
+# apigee-master --profiles all --name 'Uber SA'
+# apigee-mart-dev --profiles apigee-mart --name 'Mart for Dev'
+#
 if [ "$action" = "create-sa" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+    SA_IDS="$2"
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing a Service Account ID(s) or all"
        echo ""
        show_help
        exit 1
     fi
-    COMP_ID=$3
 
-    if [ "$COMP" = "all" ]; then
-        COMP="$APIGEE_COMP_ALL"
+    # SA_PROFILES and SA_NAME are passed via options and are optional
+    # for all, --suffix is checked
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
+    fi
+
+    # iterate through SA_ID list
+    IFS=","
+    for SA_ID in $SA_IDS; do
+        if [ "$PROFILES" = "" ]; then
+            PROFILES="$SA_ID"
+        fi
+
+        create_sa "${PROJECT}" "$SA_ID$SUFFIX" "$PROFILES" "$NAME"
+    done
+
+#---
+elif [ "$action" = "create-key" ]; then
+    function show_create_key_help(){
+       echo ""
+       echo "Example: ahr-sa-ctl create-key apigee-logger,apigee-mart|all --sa-dir=$(pwd) --force-key"
+    }
+
+    if [ ! "$SA_DIR" ]; then
+       echo "ERROR: SA_DIR is not configured. Either set up $SA_DIR env variable or use --sa_dir <dir> option."
+    fi
+
+    check_envvars "PROJECT"
+    check_commands "gcloud kubectl jq"
+
+    echo "ahr-sa-ctl: INFO Service account keys directory: $SA_DIR"
+
+
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing Service Account ID(s) or all"
+
+       show_create_key_help
+       exit 1
+    fi
+
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
     fi
 
     IFS=","
-    for c in $COMP; do
-        case "$COMP" in
-            *,*)
-                # treat comp id as suffix
-                SA_ID=apigee-${c}$COMP_ID
-                ;;
-            *)
-                # single component
-                SA_ID=$COMP_ID
-        esac
+    for sa_id in $SA_IDS; do
 
-        create_sa "${PROJECT}" "$c" "$SA_ID"
+        create_key "${PROJECT}" "$sa_id" "$FORCE_KEY_FILE"
     done
 
 
 #---
-elif [ "$action" = "create-key" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+elif [ "$action" = "sa-keys-list" ]; then
+    function show_sa_keys_list_help(){
        echo ""
-       show_help
+       echo "Example: ahr-sa-ctl list-key all"
+    }
+
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing Service Account ID(s) or all"
+
+       show_sa_keys_list_help
        exit 1
     fi
-    COMP_ID=$3
 
-    if [ "$COMP" = "all" ]; then
-        COMP="$APIGEE_COMP_ALL"
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
     fi
 
     IFS=","
-    for c in $COMP; do
-        case "$COMP" in
-            *,*)
-                # treat comp id as suffix
-                SA_ID=apigee-${c}$COMP_ID
-                ;;
-            *)
-                # single component
-                SA_ID=$COMP_ID
-        esac
+    for sa_id in $SA_IDS; do
+        sa_email=$(get_sa_email $PROJECT $sa_id)
 
-        create_key "${PROJECT}" "$c" "$SA_ID"
+        echo "Keys for SA: $sa_email"
+        gcloud iam service-accounts keys list --managed-by=user --iam-account $sa_email
+    done
+
+
+#---
+elif [ "$action" = "sa-keys-delete" ]; then
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing Service Account ID(s) or all"
+       echo ""
+       exit 1
+    fi
+
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
+    fi
+
+    if [ "$FILTER" = "" ]; then
+       echo "--filter=<field><comp><iso-date> option must be provided. Example:"
+       echo "  ahr-sa-ctl delete-key all --dry-run --filter "EXPIRES_AT<$(date -Ins)"
+       echo "  ahr-sa-ctl delete-key all --dry-run --filter "EXPIRES_AT<2021-07-07T23:59"
+       exit 2
+    fi
+
+    IFS=","
+    for sa_id in $SA_IDS; do
+        sa_email=$(get_sa_email $PROJECT $sa_id)
+
+        echo "Deleting Keys for SA: $sa_email with --filter: $FILTER"
+        if [ "$DRY_RUN" ]; then
+            echo "DRY_RUN Mode for SA: $sa_email"
+            gcloud iam service-accounts keys list --iam-account $sa_email --managed-by=user --filter="$FILTER"
+        else
+            gcloud iam service-accounts keys list --iam-account $sa_email --managed-by=user --format='value(KEY_ID)' --filter="$FILTER" | while read -r key_id; do
+                gcloud iam service-accounts keys delete $key_id --iam-account=$sa_email --quiet
+            done
+        fi
     done
 
 
 #'----
-elif [ "$action" = "config" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+elif [ "$action" = "view-sa" ]; then
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing List of SA IDs"
        echo ""
        show_help
        exit 1
     fi
 
-    SA_ID=$3
-    if [ "$SA_ID" = "" ]; then
-        SA_ID=apigee-$COMP
-    fi
-
-    if [ "$COMP" = "all" ]; then
-        COMP="$APIGEE_CONFIG_COMP_ALL"
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
     fi
 
     IFS=","
-    for c in $COMP; do
-       config_sa_by_id $PROJECT "$c" "$SA_ID"
+    for sa_id in $SA_IDS; do
+
+sa_exists $PROJECT $sa_id;
+echo ":::>>>>> $?"
+
+        if sa_exists $PROJECT $sa_id ; then
+            view_sa_by_id $PROJECT "$sa_id"
+        else
+            echo "SA does not exist: sa_id"
+        fi
     done
 
 #---
 
-elif [ "$action" = "validate-key" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+elif [ "$action" = "validate-key-file" ]; then
+    function show_validate_key_file_help(){
        echo ""
-       show_help
+       echo "Example: ahr-sa-ctl validate-key apigee-logger-key.json --profiles apigee-logger"
+    }
+
+    KEY_FILE=$2
+    if [ "$KEY_FILE" = "" ]; then
+       echo "Missing Key File: $KEY_FILE"
+
+       show_validate_key_file_help
        exit 1
     fi
-    KEY=$3
-    if [ "$KEY" = "" ]; then
-       echo "Missing Key File: $KEY"
-       echo ""
-       show_help
-       exit 1
-    fi
-    if [ ! -f "$KEY" ]; then
-        echo "Key file doesn't exist: $KEY"
-        exit 1
+    if [ ! -f "$KEY_FILE" ]; then
+        echo "ERROR: Key file doesn't exist: $KEY_FILE"
+        exit 2
     fi
 
-    config_sa_by_key $PROJECT $COMP $KEY
-    set -e
+    if [ "$PROFILES" = "" ]; then
+       echo "ERROR: Missing mandatory --profiles option to verify against."
+
+       show_validate_key_file_help
+       exit 3
+    fi
+
+    echo " Checking key Properties:"
+    read sa_email sa_id sa_key_id sa_key_expires_at < <(get_sa_key_properties "$(cat $KEY_FILE)")
+
+    echo "  SA_EMAIL: $sa_email  SA_KEY_ID: $sa_key_id  SA_KEY_eXPIRES_AT: $sa_key_expires_at"
+    if [ ! "$sa_key_expires_at" ]; then
+        echo "ERROR: key with id not found: $sa_key_id"
+
+        exit 4
+    fi 
+
+    IFS=","
+    for profile in $PROFILES; do
+        echo " Validating profile: $profile"
+        view_sa_by_key_file "$PROJECT" "$profile" "$KEY_FILE"
+    done
 
 #'-------------------
 
-elif [ "$action" = "rebind" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+elif [ "$action" = "rebind-sa" ]; then
+    function show_rebind_sa_help(){
        echo ""
+       echo "Rebind SA roles"
+       echo "Example: ahr-sa-ctl rebind-sa apigee-synchronizer"
+    }
+
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing a Service Account ID(s) or all"
        show_help
        exit 1
     fi
 
-    SA_ID=$3
-
-    if [ "$COMP" = "all" ]; then
-        COMP="$APIGEE_CONFIG_COMP_ALL"
+    if [ "$SA_IDS" = "all" ]; then
+        SA_IDS="$APIGEE_SA_ALL"
     fi
 
+    check_envvars "PROJECT"
+    check_commands "gcloud"
+
     IFS=","
-    for c in $COMP; do
-       rebind_sa $PROJECT "$c" "$SA_ID"
+    for SA_ID in $SA_IDS; do
+        if [ "$PROFILES" = "" ]; then
+           PROFILES="$SA_ID"
+        fi
+
+        rebind_sa "$PROJECT" "$SA_ID" "$PROFILES"
     done
 
 #'---
 
 
-elif [ "$action" = "delete" ]; then
-    COMP=$2
-    if [ "$COMP" = "" ]; then
-       echo "Missing Component: "
+elif [ "$action" = "delete-sa" ]; then
+    SA_IDS=$2
+    if [ "$SA_IDS" = "" ]; then
+       echo "Missing Service Account ID: "
        echo ""
        show_help
        exit 1
     fi
 
-    SA_ID=$3
-
-    if [ "$COMP" = "all" ]; then
+    if [ "$SA_IDS" = "all" ]; then
         COMP="$APIGEE_COMP_ALL"
     fi
 
     IFS=","
-    for c in $COMP; do
-       delete_sa $PROJECT "$c" "$SA_ID"
+    for sa_id in $SA_IDS; do
+       delete_sa $PROJECT "$sa_id"
     done
+
+
+
+# ----------------------------------------------------------------------
+
+elif [ "$action" = "sa-keys-report" ]; then
+
+    check_commands "gcloud kubectl jq ahr-runtime-ctl"
+    check_envvars "ORG"
+
+    sa_key_iterator "sa_keys_report"
+
+# ----------------------------------------------------------------------
+elif [ "$action" = "sa-keys-rotate" ]; then
+
+    if [ "$2" != "" ]; then
+       SA_DIR="$2"
+    fi
+    if [ "$SA_DIR" = "" ]; then
+       SA_DIR=$(pwd)
+    fi
+
+    check_envvars "PROJECT SA_DIR"
+    check_commands "gcloud kubectl jq"
+
+
+    function get_key_from_secret() {
+        local sn=$1
+
+        local key=$(kubectl get secret -n apigee $sn -o json |  jq --raw-output '.data."client_secret.json"' | base64 -d)
+
+        if [ "$key" = "" ]; then
+            # key is empty; trying to recover it from last-applied-configuration..."
+            local lac=$(kubectl get secret -n apigee $sn -o json |  jq --raw-output '.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration"')
+            if [ "$lac" ]; then
+                key=$(echo "$lac" | jq --raw-output '.data."client_secret.json"' | base64 -d)
+            fi
+        fi
+        echo "$key"
+    }
+
+    echo "ahr-sa-ctl: INFO Service account keys directory: $SA_DIR"
+
+    declare -A ads
+
+    declare -A ids
+    declare -A sns
+
+    declare -A dss
+
+    # ApigeeDeployment
+    for ad in $(kubectl get -n apigee ad -o json|jq .items[].metadata.name -r); do
+        sn=$(kubectl -n apigee get ad $ad -o json|jq '.spec.template.spec.volumes[]|select(.name|contains("svc-account-volume")).secret.secretName // empty' -r)
+        if [ "$sn" ]; then
+
+            key=$( get_key_from_secret "$sn" )
+            if [ "$key" ]; then
+                read sa_email sa_id sa_key_id sa_key_expires_at sa_key_dte < <(get_sa_key_properties "$key")
+
+                echo "SA Key for AD: $ad $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"
+
+                if [ ! "${ids[$sa_id]}" ]; then
+                    ids[$sa_id]="$sa_email"
+                fi
+                ads[$ad]="$sa_id"
+                sns[$ad]="$sn"
+            else
+                echo "ERROR: key for AD "$AD" is not recoverable it might not exist; configure it using ....."
+            fi
+        else
+            echo "SA Key for AD: $ad - - - -"
+        fi
+    done
+
+    # ApigeeTelemetry DaemonSet
+        ds=apigee-logger-apigee-telemetry
+        sn=$( kubectl -n apigee get ds $ds -o json|jq '.spec.template.spec.volumes[]|select(.name|contains("svc-account-volume")).secret.secretName // empty' -r)
+        if [ "$sn" ]; then
+            key=$( get_key_from_secret "$sn" )
+            if [ "$key" ]; then
+                read sa_email sa_id sa_key_id sa_key_expires_at sa_key_dte < <(get_sa_key_properties "$key")
+
+                echo "SA Key for DS: $ds $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"
+
+                if [ ! "${ids[$sa_id]}" ]; then
+                    ids[$sa_id]="$sa_email"
+                fi
+                dss[$ds]="$sa_id"
+                sns[$ds]="$sn"
+            else
+                echo "ERROR: key for DS "$ds" is not recoverable it might not exist; configure it using ....."
+            fi
+        else
+            echo "SA Key for DS: $ds - - - -"
+        fi
+
+
+if [ "$DEBUG" ]; then
+
+
+echo "ids[]"
+for id in "${!ids[@]}"; do
+    echo ": $id  ${ids[$id]}"
+done
+
+
+echo "sns[]"
+for sn in "${!sns[@]}"; do
+    echo ": $sn ${sns[$sn]}"
+done
+
+echo "ads[]"
+for ad in "${!ads[@]}"; do
+    echo ": $ad ${ads[$ad]}"
+done
+
+echo "dss[]"
+for ds in "${!dss[@]}"; do
+    echo ": $ds ${dss[$ds]}"
+done
+
+
+
+fi
+
+if [ "$DRY_RUN" ]; then
+   exit
+fi
+
+
+echo "ahr-sa-ctl: INFO rotate secrets for project/org: $PROJECT"
+
+
+for sa_id in "${!ids[@]}"; do
+    echo "Processing SA Id: $sa_id"
+
+    sa_email="${ids[$sa_id]}"
+
+    sa_key_json=$SA_DIR/${PROJECT}-${sa_id}.json
+
+    # check if present; move to timestamp .bak
+    if [ -f "$sa_key_json" ]; then
+        sa_key_json_bak=$sa_key_json.$(date '+%Y%m%d-%H%M')
+        echo "  Key File: $sa_key_json exists; moving to: $sa_key_json_bak"
+        mv "$sa_key_json" "$sa_key_json_bak"
+    fi
+
+    echo "  Creating Key File: $sa_key_json"
+    gcloud iam service-accounts keys create ${sa_key_json} --iam-account $sa_email
+done
+
+function patch_key_secret (){
+    local sa_id=$1
+    local sn=$2
+    local secret_property=$3
+
+    sa_key_json=$SA_DIR/${PROJECT}-${sa_id}.json
+
+    echo "  Patching Secret property $SECRET_PROPERTY of secret: $sn"
+    kubectl patch -n apigee secret $sn -p="{\"data\":{\"$secret_property\": \"$(cat $sa_key_json|base64 -w 0)\"}}"
+}
+
+# ApigeeDeployment
+for ad in "${!ads[@]}"; do
+    echo "Processing ApigeeDeployment: $ad"
+
+    patch_key_secret "${ads[$ad]}" "${sns[$ad]}" "client_secret.json"
+
+    echo "  ApigeeDeployment rollout restart: $ad"
+    ahr-runtime-ctl ad-rollout-restart $ad
+done
+
+# DaemonSet
+for ds in "${!dss[@]}"; do
+    echo "Processing DaemonSet: $ds"
+
+    patch_key_secret "${dss[$ds]}" "${sns[$ds]}" "client_secret.json"
+
+    echo "  ApigeeDeployment rollout restart: $at"
+    kubectl rollout restart ds $ds -n apigee
+done
+
+
+
+# ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
 else

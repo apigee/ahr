@@ -58,6 +58,25 @@ function check_commands() {
 }
 
 
+function get_org_env_sha() {
+    # ENV == "" controls $ORG or $ORG/$ENV sha
+    local ORG=$1
+    local ENV=$2
+
+    if [ "$ENV" = "" ]; then
+        # $ORG_SHA
+
+        local ORG_SHA=${ORG:0:15}-$(echo -n "$ORG" | openssl dgst -sha256 -binary | xxd -p -c256 | cut -c1-7)
+        echo -n "$ORG_SHA"
+
+    else
+        # $ORG_ENV_SHA
+
+        local ORG_ENV_SHA=${ORG:0:15}-${ENV:0:15}-$(echo -n "$ORG:$ENV" | openssl dgst -sha256 -binary | xxd -p -c256 | cut -c1-7)
+        echo -n "$ORG_ENV_SHA"
+    fi
+}
+
 function get_password(){
     local password
     local passconfirm

@@ -50,9 +50,12 @@ function show_help(){
     echo "                    us-central1 us-east1 us-east4 us-west1"
     echo ""
     echo "    ahr-runtime-ctl env-create <env-name>"
+    echo "    ahr-runtime-ctl env-list"
     echo "    ahr-runtime-ctl env-group-create <env-group-name> <runtime-host-alias>"
     echo "    ahr-runtime-ctl env-group-config <env-group-name>"
     echo "    ahr-runtime-ctl env-group-assign <org-name> <env-group-name> <env-name>"
+    echo ""
+    echo "    ahr-runtime-ctl ad-rollout-restart $AD"
     echo ""
 }
 
@@ -383,6 +386,14 @@ EOT
 wait_for_ready "\"$ENV\"" 'curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV | jq ".name"' "Environment $ENV of Organization $ORG is created."
 
 
+
+#-----------------------------------------------------------------------
+elif [ "env-list" == "$ACTION" ]; then
+
+check_envvars "ORG"
+curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments
+
+
 #-----------------------------------------------------------------------
 elif [ "env-group-create" == "$ACTION" ]; then
     if [ "$#" -lt 3 ]; then
@@ -462,6 +473,21 @@ curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" htt
 }
 EOT
 
+#-----------------------------------------------------------------------
+elif [ "ad-rollout-restart" == "$ACTION" ]; then
+    if [ "$#" -lt 2 ]; then
+        echo "ERROR: ApigeeDeployment is not provided."
+        echo ""
+        echo "    ahr-runtime-ctl ad-rollout-restart \$AD"
+        show_help
+        exit 5
+    fi
+    AD=$2
+    NS=apigee
+
+    check_commands "kubectl"
+
+    kubectl -n $NS patch ad $AD -p '{"release":{"replaceWithClone":true}}' --type=merge
 
 #-----------------------------------------------------------------------
 elif [ "install-profile" == "$ACTION" ]; then
