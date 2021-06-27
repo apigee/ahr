@@ -564,7 +564,7 @@ echo -e "Pre-flight checks and settings: gcp project; product versions; enabling
 ## Hybrid Install Environment bootstrapping and version selection persistance
 #"
 
-export HYBRID_VERSION=${HYBRID_VERSION:-1.4.0}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.5.0}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
