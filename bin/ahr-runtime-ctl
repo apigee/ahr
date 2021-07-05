@@ -201,6 +201,7 @@ cd $APIGEECTL_HOME
 
 if [[ " ${@} " =~ " wait-for-ready " ]]; then
 
+sleep 2 && printf "Wait for ready: "
     bash <<T
 while true; do
     exit_code=\$(${@/wait-for-ready/check-ready} 2>/dev/null; echo \$?)
@@ -214,7 +215,7 @@ while true; do
 done
 T
 
-printf "Wait for apigee-controller-manager/apigee-system ready: "
+sleep 2 && printf "Wait for apigee-controller-manager/apigee-system ready: "
 while [[ "$(kubectl get deployment  -n apigee-system apigee-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" != "True" ]]; do
   printf "."
   sleep 3
