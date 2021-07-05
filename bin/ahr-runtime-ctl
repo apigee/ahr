@@ -577,9 +577,11 @@ mkdir -p $HYBRID_HOME
 
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
-cp $AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh $HYBRID_ENV
+export HYBRID_ENV_TEMPLATE=$AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sH
 
-export HYBRID_TEMPLATE=$AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml
+cp $HYBRID_ENV $HYBRID_ENV
+
+export RUNTIME_TEMPLATE=$AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml
 
 #' persist version selection
 sed -i -E "s/^(export HYBRID_VERSION=).*/\1$HYBRID_VERSION/g" $HYBRID_ENV
@@ -603,7 +605,9 @@ echo "Apigee Hybrid Configuration:"
 echo ""
 
 echo "Apigee Hybrid Version: $HYBRID_VERSION"
-echo "Apigee Hybrid Template: $HYBRID_TEMPLATE"
+
+echo "Apigee Hybrid ENV Example: $HYBRID_ENV_TEMPLATE"
+echo "Apigee Hybrid Runtime Template: $RUNTIME_TEMPLATE"
 
 echo "GKE Cluster Version: $CLUSTER_VERSION"
 echo "GKE Cluster Template: $CLUSTER_TEMPLATE"
