@@ -618,7 +618,7 @@ echo -e "\nUsing Project: $PROJECT"
 #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # confirm if not quiet install
 if [ ! "$QUIET" = "Y" ]; then
-  read -p "Do you want to continue with the config above? [Y/n]: " -n 1 -r REPLY; printf "\n"
+  read -p "Do you want to continue with the config above (use --quiet to suppress)? [Y/n]: " -n 1 -r REPLY; printf "\n"
   REPLY=${REPLY:-Y}
 
   if [[ "$REPLY" =~ ^[Yy]$ ]]; then
