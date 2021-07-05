@@ -201,7 +201,7 @@ cd $APIGEECTL_HOME
 
 if [[ " ${@} " =~ " wait-for-ready " ]]; then
 
-sleep 2 && printf "Wait for ready: "
+printf "Wait for ready: "
     bash <<T
 while true; do
     exit_code=\$(${@/wait-for-ready/check-ready} 2>/dev/null; echo \$?)
@@ -215,7 +215,7 @@ while true; do
 done
 T
 
-sleep 2 && printf "Wait for apigee-controller-manager/apigee-system ready: "
+printf "Wait for apigee-controller-manager/apigee-system ready: "
 while [[ "$(kubectl get deployment  -n apigee-system apigee-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" != "True" ]]; do
   printf "."
   sleep 3
@@ -786,6 +786,10 @@ source <(ahr-runtime-ctl get-apigeectl)
 # Install Hybrid runtime
 
 ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
+
+echo "!!! Waiting hack: 30 secs"
+sleep 30
+
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
