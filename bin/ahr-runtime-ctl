@@ -606,7 +606,7 @@ echo ""
 
 echo "Apigee Hybrid Version: $HYBRID_VERSION"
 
-echo "Apigee Hybrid ENV Example: $HYBRID_ENV_TEMPLATE"
+echo "Apigee Hybrid ENV Example: $HYBRID_ENV_EXAMPLE"
 echo "Apigee Hybrid Runtime Template: $RUNTIME_TEMPLATE"
 
 echo "GKE Cluster Version: $CLUSTER_VERSION"
