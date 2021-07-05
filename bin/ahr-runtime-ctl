@@ -214,9 +214,9 @@ while true; do
 done
 
 printf "Wait for apigee-controller-manager/apigee-system ready: "
-while [[ $(kubectl get deployment  -n apigee-system apigee-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}') != 'True' ]]; do
- printf "."
- sleep 3
+while [[ "$(kubectl get deployment  -n apigee-system apigee-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" != "True" ]]; do
+  printf "."
+  sleep 3
 done
 printf " Ready\n"
 
