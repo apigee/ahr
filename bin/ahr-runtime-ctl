@@ -536,6 +536,10 @@ case "$1" in
 
     shift 2;;
 
+  -q|--quiet)
+    QUIET=Y
+    shift;;
+
   *)
     pps="$pps $1"
     shift;;
@@ -564,7 +568,7 @@ echo -e "Pre-flight checks and settings: gcp project; product versions; enabling
 ## Hybrid Install Environment bootstrapping and version selection persistance
 #"
 
-export HYBRID_VERSION=${HYBRID_VERSION:-1.5.0}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.5.1}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
@@ -574,6 +578,8 @@ mkdir -p $HYBRID_HOME
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
 cp $AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh $HYBRID_ENV
+
+export HYBRID_TEMPLATE=$AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml
 
 #' persist version selection
 sed -i -E "s/^(export HYBRID_VERSION=).*/\1$HYBRID_VERSION/g" $HYBRID_ENV
@@ -591,12 +597,16 @@ if [ -n "$ASM_VERSION" ]; then
   sed -i -E "s/^(export ASM_VERSION=).*/\1$ASM_VERSION/g" $HYBRID_ENV
 fi
 
-
 source $HYBRID_ENV
 
-echo "Apigee Hybrid version: $HYBRID_VERSION"
+echo "Apigee Hybrid Configuration:"
+echo ""
 
-echo "Kubernetes Cluster Version: $CLUSTER_VERSION"
+echo "Apigee Hybrid Version: $HYBRID_VERSION"
+echo "Apigee Hybrid Template: $HYBRID_TEMPLATE"
+
+echo "GKE Cluster Version: $CLUSTER_VERSION"
+echo "GKE Cluster Template: $CLUSTER_TEMPLATE"
 
 echo "Certificate Manager manifest: $CERT_MANAGER_MANIFEST"
 echo "ASM version: $ASM_VERSION"
@@ -604,6 +614,20 @@ echo "ASM version: $ASM_VERSION"
 
 echo -e "\nUsing Project: $PROJECT"
 
+
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# confirm if not quiet install
+if [ ! "$QUIET" = "Y" ]; then
+  read -p "Do you want to continue with the config above? [Y/n]: " -n 1 -r REPLY; printf "\n"
+  REPLY=${REPLY:-Y}
+
+  if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+    echo "Starting Installation..."
+  else
+    exit 1
+  fi
+fi
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 gcloud config set project $PROJECT
 
@@ -731,7 +755,7 @@ if [[ "$COMPS" =~ ";runtime-config;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 printf "\nAHR: Generating Hybrid Runtime config: $RUNTIME_CONFIG\n"
 
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
-ahr-runtime-ctl template $AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml > $RUNTIME_CONFIG
+ahr-runtime-ctl template $RUNTIME_TEMPLATE > $RUNTIME_CONFIG
 
 fi
 
