@@ -577,9 +577,9 @@ mkdir -p $HYBRID_HOME
 
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
-export HYBRID_ENV_TEMPLATE=$AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sH
+export HYBRID_ENV_EXAMPLE=$AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sH
 
-cp $HYBRID_ENV $HYBRID_ENV
+cp $HYBRID_ENV_EXAMPLE $HYBRID_ENV
 
 export RUNTIME_TEMPLATE=$AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml
 
