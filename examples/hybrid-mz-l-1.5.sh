@@ -60,7 +60,8 @@ export AX_REGION=${AX_REGION:-europe-west1}
 export CLUSTER_TEMPLATE=$AHR_HOME/templates/cluster-multi-zone-two-nodepools-template.json
 export CLUSTER_CONFIG=$HYBRID_HOME/cluster-mz.json
 
-export MACHINE_TYPE_DATA=${MACHINE_TYPE_DATA:-e2-standard-8}
+# For a real production e2-standard-8 is recommended. -4 is used to fit into 24 CPU per region limit
+export MACHINE_TYPE_DATA=${MACHINE_TYPE_DATA:-e2-standard-4}
 export MACHINE_TYPE_RUNTIME=${MACHINE_TYPE_RUNTIME:-e2-standard-4}
 
 export CLUSTER_VERSION=1.18
@@ -100,6 +101,7 @@ export SYNCHRONIZER_SA=$SA_DIR/$PROJECT-$SYNCHRONIZER_ID.json
 export UDCA_SA=$SA_DIR/$PROJECT-apigee-udca.json
 export MART_SA=$SA_DIR/$PROJECT-apigee-mart.json
 export METRICS_SA=$SA_DIR/$PROJECT-apigee-metrics.json
+export WATCHER_SA=$SA_DIR/$PROJECT-apigee-watcher.json
 
 export MART_SA_ID=$MART_ID@$PROJECT.iam.gserviceaccount.com
 export SYNCHRONIZER_SA_ID=$SYNCHRONIZER_ID@$PROJECT.iam.gserviceaccount.com

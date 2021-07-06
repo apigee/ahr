@@ -105,3 +105,6 @@ connectAgent:
 
 metrics:
   serviceAccountPath: $METRICS_SA
+
+watcher:
+  serviceAccountPath: $WATCHER_SA
