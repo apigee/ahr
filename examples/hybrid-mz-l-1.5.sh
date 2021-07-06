@@ -17,7 +17,7 @@
 # collection of variables to define apigee hybrid topology and configuration
 #
 #  cloud: GCP
-#  cluster: small, single-zone
+#  cluster: two node-pools, multi-zonal
 #  
 #
 # usage:
@@ -42,10 +42,10 @@ export HYBRID_VERSION=${HYBRID_VERSION:-1.5.1}
 export APIGEECTL_TARBALL_URL=$(get_apigeectl_tarball_url "$HYBRID_VERSION" "$PLATFORM")
 export APIGEECTL_TARBALL=apigeectl_$(get_platform_suffix apigeectl "$PLATFORM")
 
-#
-# GCP Project:
-#
 
+#
+# GCP Project: 
+#
 export NETWORK=default
 export SUBNETWORK=default
 
@@ -57,8 +57,8 @@ export AX_REGION=${AX_REGION:-europe-west1}
 #
 # Runtime Cluster definition
 #
-export CLUSTER_TEMPLATE=$AHR_HOME/templates/cluster-single-zone-one-nodepool-template.json
-export CLUSTER_CONFIG=$HYBRID_HOME/cluster-sz.json
+export CLUSTER_TEMPLATE=$AHR_HOME/templates/cluster-multi-zone-two-nodepools-template.json
+export CLUSTER_CONFIG=$HYBRID_HOME/cluster-mz.json
 
 export MACHINE_TYPE_DATA=${MACHINE_TYPE_DATA:-e2-standard-8}
 export MACHINE_TYPE_RUNTIME=${MACHINE_TYPE_RUNTIME:-e2-standard-4}
@@ -66,27 +66,29 @@ export MACHINE_TYPE_RUNTIME=${MACHINE_TYPE_RUNTIME:-e2-standard-4}
 export CLUSTER_VERSION=1.18
 
 export CLUSTER=hybrid-cluster
-export CLUSTER_ZONE=${ZONE}
-export CLUSTER_LOCATIONS='"'${ZONE:-europe-west1-b}'"'
+export CLUSTER_ZONE=europe-west1-b
+export CLUSTER_LOCATIONS='"europe-west1-b","europe-west1-c","europe-west1-d"'
 export CONTEXT=$CLUSTER
-
 
 #------------------------------------------------------------
 
 # 
 # Runtime Hybrid configuration
 #
-export RUNTIME_CONFIG=$HYBRID_HOME/runtime-sz.yaml
+export RUNTIME_CONFIG=$HYBRID_HOME/runtime-mz.yaml
 
 
 export ORG=$PROJECT
 export ENV=test
 export ENV_GROUP=test-group
 
+export CASSANDRA_REQUESTS_CPU=1000m
+export CASSANDRA_REQUESTS_MEMORY=2Gi
+export CASSANDRA_STORAGE_CAPACITY=20Gi
+
 #export ENC_KEY_KMS=$(LC_ALL=C tr -dc "[:print:]" < /dev/urandom | head -c 32 | openssl base64)
 #export ENC_KEY_KVM=$ENC_KEY_KMS
 #export ENC_KEY_CACHE=$ENC_KEY_KMS
-
 
 export SA_DIR=$HYBRID_HOME/service-accounts
 
@@ -98,7 +100,6 @@ export SYNCHRONIZER_SA=$SA_DIR/$PROJECT-$SYNCHRONIZER_ID.json
 export UDCA_SA=$SA_DIR/$PROJECT-apigee-udca.json
 export MART_SA=$SA_DIR/$PROJECT-apigee-mart.json
 export METRICS_SA=$SA_DIR/$PROJECT-apigee-metrics.json
-export WATCHER_SA=$SA_DIR/$PROJECT-apigee-watcher.json
 
 export MART_SA_ID=$MART_ID@$PROJECT.iam.gserviceaccount.com
 export SYNCHRONIZER_SA_ID=$SYNCHRONIZER_ID@$PROJECT.iam.gserviceaccount.com

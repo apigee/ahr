@@ -509,8 +509,9 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo ""
         echo "Required Environment Variable: AHR_HOME PROJECT"
         echo ""
-        echo "Supported hybrid profiles: small"
-        echo "Supported asm profiles: asm-gcp asm-multicloud"
+        echo "Supported hybrid profiles: small    single-zone, small runtime"
+        echo "                           large    multi-zone, large runtime"
+        echo "Supported asm profiles: asm-gcp"
         echo "Supported comma-separated components: cluster cert-manager gcp-ip istio apigee-org runtime "
         echo ""
         echo "Override if you wish (ie, set up before calling the operation):"
@@ -562,8 +563,22 @@ eval set -- "$pps"
     check_envvars "AHR_HOME PROJECT HYBRID_HOME HYBRID_PROFILE ASM_PROFILE"
 
 # 
-# profile: small
+# profile: small|large
 # 
+
+if [ "$HYBRID_PROFILE" = "small" ]; then
+    PROFILE_CLUSTER_ZONE_TYPE=sz-s
+    PROFILE_RUNTIME_SIZE=small
+
+elif [ "$HYBRID_PROFILE" = "large" ]; then
+    PROFILE_CLUSTER_ZONE_TYPE=mz-l
+    PROFILE_RUNTIME_SIZE=large
+
+else
+    echo "ERROR: Unkown Value of Hybrid Profile: $HYBRID_PROFILE"
+    exit 5
+fi
+
 
 export PROJECT
 
@@ -574,24 +589,28 @@ echo -e "Pre-flight checks and settings: gcp project; product versions; enabling
 
 
 ## Hybrid Install Environment bootstrapping and version selection persistance
-#"
+#
+
+
 
 export HYBRID_VERSION=${HYBRID_VERSION:-1.5.1}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
 
+
+
 mkdir -p $HYBRID_HOME
 
 export HYBRID_VERSION_MINOR=$(echo -n "$HYBRID_VERSION"|awk '{sub(/\.[0-9]$/,"");print}')
 
-export HYBRID_ENV_EXAMPLE=$AHR_HOME/examples/hybrid-sz-s-$HYBRID_VERSION_MINOR.sh
+export HYBRID_ENV_EXAMPLE=$AHR_HOME/examples/hybrid-$PROFILE_CLUSTER_ZONE_TYPE-$HYBRID_VERSION_MINOR.sh
 
 cp $HYBRID_ENV_EXAMPLE $HYBRID_ENV
 
-export RUNTIME_TEMPLATE=$AHR_HOME/templates/overrides-small-$HYBRID_VERSION_MINOR-template.yaml
+export RUNTIME_TEMPLATE=$AHR_HOME/templates/overrides-$PROFILE_RUNTIME_SIZE-$HYBRID_VERSION_MINOR-template.yaml
 
-#' persist version selection
+# persist version selection
 sed -i -E "s/^(export HYBRID_VERSION=).*/\1$HYBRID_VERSION/g" $HYBRID_ENV
 
 if [ -n "$CLUSTER_VERSION" ]; then
@@ -611,14 +630,15 @@ source $HYBRID_ENV
 
 echo "Apigee Hybrid Configuration:"
 echo ""
+echo "Hybrid Profile: $HYBRID_PROFILE"
 
 echo "Apigee Hybrid Version: $HYBRID_VERSION"
 
-echo "Apigee Hybrid ENV Example: $HYBRID_ENV_EXAMPLE"
-echo "Apigee Hybrid Runtime Template: $RUNTIME_TEMPLATE"
+echo "Apigee Hybrid Environement Variables for \$HYBRID_ENV: $HYBRID_ENV_EXAMPLE"
+echo "Apigee Hybrid Runtime Template for \$RUNTIME_CONFIG: $RUNTIME_TEMPLATE"
 
 echo "GKE Cluster Version: $CLUSTER_VERSION"
-echo "GKE Cluster Template: $CLUSTER_TEMPLATE"
+echo "GKE Cluster Template for \$CLUSTER_CONFIG: $CLUSTER_TEMPLATE"
 
 echo "Certificate Manager manifest: $CERT_MANAGER_MANIFEST"
 echo "ASM version: $ASM_VERSION"
