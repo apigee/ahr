@@ -851,6 +851,9 @@ export HYBRID_HOME=$HYBRID_HOME
 export HYBRID_ENV=$HYBRID_ENV
 source \$HYBRID_ENV
 
+# for: bash: _get_comp_words_by_ref: command not found
+#    sudo apt -y install bash-completion
+#    source ~/.profile
 alias k=kubectl
 source <(kubectl completion bash)
 complete -F __start_kubectl k
