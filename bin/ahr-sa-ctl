@@ -254,6 +254,7 @@ function create_sa() {
     fi
 set +e
     gcloud iam service-accounts create ${SA_ID} --display-name "${SA_NAME}"
+set -e
 
     for profile in $SA_PROFILES; do
         local SA_ROLE=$(get $profile "_ROLES")
@@ -263,7 +264,6 @@ set +e
             gcloud projects add-iam-policy-binding ${PROJECT} --member serviceAccount:$SA_EMAIL --role ${SA_ROLE} > /dev/null
         fi
     done
-set -e
 }
 
 function create_key() {

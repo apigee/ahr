@@ -357,7 +357,7 @@ elif [ "org-create" == "$ACTION" ]; then
 check_envvars "PROJECT"
 check_commands "jq"
 
-curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations?parent=projects/$PROJECT --data-binary @- <<EOF
+response=$(curl -s -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations?parent=projects/$PROJECT --data-binary @- <<EOF
 {
     "name":"$ORG",
     "displayName":"$ORG",
@@ -366,6 +366,8 @@ curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" htt
     "analyticsRegion":"$AX_REGION"
 }
 EOF
+)
+check_already_exists "$response"
 
 # make it a synchronous call
 wait_for_ready "\"$ORG\"" 'curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG | jq ".name"' "Organization $ORG is created." 
@@ -382,13 +384,16 @@ elif [ "env-create" == "$ACTION" ]; then
     ENV=$2
 
 check_envvars "ORG"
-curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments --data-binary @- <<EOT
+
+response=$(curl -s -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments --data-binary @- <<EOT
 {
   "name": "$ENV",
   "description": "$ENV environment",
   "displayName": "$ENV"
 }
 EOT
+)
+check_already_exists "$response"
 
 # make it a synchronous call
 wait_for_ready "\"$ENV\"" 'curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json"  https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV | jq ".name"' "Environment $ENV of Organization $ORG is created."
@@ -416,12 +421,15 @@ elif [ "env-group-create" == "$ACTION" ]; then
 
 check_envvars "ORG"
 
-curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups --data-binary @- <<EOT
+response=$(curl -s -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups --data-binary @- <<EOT
 {
   "name": "$ENV_GROUP",
   "hostnames": [ $HOSTNAMES ]
 }
 EOT
+)
+check_already_exists "$response"
+
 
 #-----------------------------------------------------------------------
 elif [ "env-group-config" == "$ACTION" ]; then
@@ -453,12 +461,14 @@ elif [ "env-group-set-hostnames" == "$ACTION" ]; then
 check_envvars "ORG"
 
 
-curl -X PATCH -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP --data-binary @- <<EOT
+response=$(curl -s -X PATCH -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP --data-binary @- <<EOT
 {
   "name": "$ENV_GROUP",
   "hostnames": [ $HOSTNAMES ]
 }
 EOT
+)
+check_already_exists "$response"
 
 #-----------------------------------------------------------------------
 elif [ "env-group-assign" == "$ACTION" ]; then
@@ -475,11 +485,13 @@ elif [ "env-group-assign" == "$ACTION" ]; then
 
 check_envvars "ORG"
 
-curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP/attachments --data-binary @- <<EOT
+response=$(curl -s -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP/attachments --data-binary @- <<EOT
 {
   "environment": "$ENV"
 }
 EOT
+)
+check_already_exists "$response"
 
 #-----------------------------------------------------------------------
 elif [ "ad-rollout-restart" == "$ACTION" ]; then
@@ -561,6 +573,7 @@ eval set -- "$pps"
     ASM_PROFILE=$3
 
     check_envvars "AHR_HOME PROJECT HYBRID_HOME HYBRID_PROFILE ASM_PROFILE"
+    check_commands "gcloud kubectl jq"
 
 # 
 # profile: small|large
@@ -586,7 +599,6 @@ export PROJECT
 if [[ "$COMPS" =~ ";all;" ]]; then
 
 echo -e "Pre-flight checks and settings: gcp project; product versions; enabling apis...\n"
-
 
 ## Hybrid Install Environment bootstrapping and version selection persistance
 #

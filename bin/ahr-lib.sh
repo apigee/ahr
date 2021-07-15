@@ -57,6 +57,19 @@ function check_commands() {
     fi
 }
 
+function check_already_exists() {
+    response="$1"
+
+    if [ "$( grep -c error <<< "$response" )" -ne 0  ]; then
+        >&2 echo "$response"
+        if [[ "$response" =~ "ALREADY_EXISTS" ]]; then
+            >&2 echo "Already Exists. Continue."
+        else
+            return 1
+        fi
+    fi
+}
+
 
 function get_org_env_sha() {
     # ENV == "" controls $ORG or $ORG/$ENV sha

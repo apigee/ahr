@@ -217,7 +217,8 @@ else # >= 1.6
 
     gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
 
-    curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data ''
+    response=$(curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data '')
+    check_already_exists "$response"
 
 fi
 
