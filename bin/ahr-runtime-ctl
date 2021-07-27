@@ -94,7 +94,7 @@ function validate_org_name(){
 }
 
 
-# put items of the comman separeted list into double quotes
+# put items of the comma separated list into double quotes
 function quotes() {
     echo "$1" | awk 'BEGIN{FS=",";OFS=","}{for(i=1;i<=NF;i++) $i="\""$i"\""; print}'
 }
