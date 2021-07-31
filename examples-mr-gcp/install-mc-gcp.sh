@@ -54,6 +54,10 @@ ahr-sa-ctl create-sa all
 
 ahr-sa-ctl create-key all
 
+ahr-runtime-ctl setsync $SYNCHRONIZER_SA_ID
+
+ahr-runtime-ctl org-config
+
 #
 # Hybrid Region 1: Install Hybrid
 #
