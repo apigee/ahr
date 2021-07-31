@@ -24,6 +24,9 @@ check_commands "gcloud kubectl jq yq"
 # gcp
 gcloud config set project $PROJECT
 
+
+ahr-verify-ctl api-enable
+
 #
 # Create Region 1 cluster 
 #
@@ -34,33 +37,6 @@ ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
 set +e
 ahr-cluster-ctl create
 set -e
-
-#
-# Create Region 2 cluster 
-#
-source $HYBRID_HOME/mr-r2-gke-cluster.env
-
-ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
-
-set +e
-ahr-cluster-ctl create
-set -e
-
-# Multi-region Connectivity for Cassandra
-export R1_CLUSTER_CIDR=$(gcloud container clusters describe $R1_CLUSTER --zone=$R1_CLUSTER_ZONE  --format='value(clusterIpv4Cidr)')
-
-export R2_CLUSTER_CIDR=$(gcloud container clusters describe $R2_CLUSTER --zone=$R2_CLUSTER_ZONE  --format='value(clusterIpv4Cidr)')
-
-set +e
-gcloud compute firewall-rules create allow-cs-7001 \
-    --project $PROJECT \
-    --network $NETWORK \
-    --allow tcp:7001 \
-    --direction INGRESS \
-    --source-ranges $R1_CLUSTER_CIDR,$R2_CLUSTER_CIDR
-set -e
-
-ahr-verify-ctl api-enable
 
 #
 # Apigee ORG
@@ -147,6 +123,33 @@ ahr-runtime-ctl install-profile small asm-gcp -c source-env
 
 
 $AHR_HOME/proxies/deploy.sh
+
+
+#
+# Create Region 2 cluster 
+#
+source $HYBRID_HOME/mr-r2-gke-cluster.env
+
+ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
+
+set +e
+ahr-cluster-ctl create
+set -e
+
+# Multi-region Connectivity for Cassandra
+export R1_CLUSTER_CIDR=$(gcloud container clusters describe $R1_CLUSTER --zone=$R1_CLUSTER_ZONE  --format='value(clusterIpv4Cidr)')
+
+export R2_CLUSTER_CIDR=$(gcloud container clusters describe $R2_CLUSTER --zone=$R2_CLUSTER_ZONE  --format='value(clusterIpv4Cidr)')
+
+set +e
+gcloud compute firewall-rules create allow-cs-7001 \
+    --project $PROJECT \
+    --network $NETWORK \
+    --allow tcp:7001 \
+    --direction INGRESS \
+    --source-ranges $R1_CLUSTER_CIDR,$R2_CLUSTER_CIDR
+set -e
+
 
 #
 # Hybrid Region 2: Install Hybrid
