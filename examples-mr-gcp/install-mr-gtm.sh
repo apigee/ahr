@@ -11,6 +11,8 @@ BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 set -e
 
+source $AHR_HOME/bin/ahr-lib.sh
+
 check_envvars "AHR_HOME PROJECT HYBRID_HOME CLUSTER"
 check_commands "gcloud kubectl jq yq"
 
