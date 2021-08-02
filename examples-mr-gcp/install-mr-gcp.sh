@@ -120,6 +120,7 @@ sleep 30
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+sleep 30
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 source <(ahr-runtime-ctl get-apigeectl-home $HYBRID_HOME/$APIGEECTL_TARBALL)
@@ -221,6 +222,7 @@ sleep 30
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+sleep 30
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 

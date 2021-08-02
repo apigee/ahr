@@ -444,7 +444,7 @@ elif [ "env-group-config" == "$ACTION" ]; then
 
 check_envvars "ORG"
 
-curl -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP
+curl --silent -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP
 
 #-----------------------------------------------------------------------
 elif [ "env-group-set-hostnames" == "$ACTION" ]; then
@@ -461,7 +461,7 @@ elif [ "env-group-set-hostnames" == "$ACTION" ]; then
 check_envvars "ORG"
 
 
-response=$(curl -s -X PATCH -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP --data-binary @- <<EOT
+response=$(curl --silent -s -X PATCH -H "Authorization: Bearer $(token)" -H "Content-Type: application/json" https://apigee.googleapis.com/v1/organizations/$ORG/envgroups/$ENV_GROUP --data-binary @- <<EOT
 {
   "name": "$ENV_GROUP",
   "hostnames": [ $HOSTNAMES ]
