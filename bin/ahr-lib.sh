@@ -57,6 +57,22 @@ function check_commands() {
     fi
 }
 
+function check_gnu_date() {
+
+    VERSION=$( set +e; date --version 2>&1; echo "$?" )
+
+    if [ "$( grep -c GNU <<< "$VERSION" )" -eq 0  ]; then
+        >&2 echo ""
+        >&2 echo "ABEND. date command is not GNU."
+        >&2 echo "       For OSX  set up coreutils and use"
+        >&2 echo "       <your local bin with mv-ed date>/PATH to substitute date with gdate"
+        >&2 echo "       instead of the resident one."
+        >&2 echo "       For Windows, use cygwin."
+        return 1
+    fi
+}
+
+
 function check_already_exists() {
     response="$1"
 
