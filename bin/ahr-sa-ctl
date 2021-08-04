@@ -578,7 +578,7 @@ elif [ "$action" = "create-key" ]; then
 elif [ "$action" = "sa-keys-list" ]; then
     function show_sa_keys_list_help(){
        echo ""
-       echo "Example: ahr-sa-ctl list-key all"
+       echo "Example: ahr-sa-ctl sa-keys-list all"
     }
 
     SA_IDS=$2
@@ -617,10 +617,14 @@ elif [ "$action" = "sa-keys-delete" ]; then
 
     if [ "$FILTER" = "" ]; then
        echo "--filter=<field><comp><iso-date> option must be provided. Example:"
-       echo "  ahr-sa-ctl delete-key all --dry-run --filter "EXPIRES_AT<$(date -Ins)"
-       echo "  ahr-sa-ctl delete-key all --dry-run --filter "EXPIRES_AT<2021-07-07T23:59"
+       echo '  ahr-sa-ctl sa-keys-delete all --dry-run --filter "EXPIRES_AT<$(date -Ins)"'
+       echo '  ahr-sa-ctl sa-keys-delete all --dry-run --filter "EXPIRES_AT<2021-07-07T23:59'
        exit 2
     fi
+
+    check_envvars "PROJECT"
+    check_commands "gcloud"
+    check_gnu_date
 
     IFS=","
     for sa_id in $SA_IDS; do
