@@ -770,9 +770,6 @@ elif [ "$action" = "sa-keys-report" ]; then
     check_envvars "ORG"
     check_gnu_date
 
-exit 5
-
-
     sa_key_iterator "sa_keys_report"
 
 # ----------------------------------------------------------------------
