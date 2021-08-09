@@ -438,7 +438,7 @@ function sa_keys_report() {
 
         echo "$CRD $A $SECRET_NAME $SA_ID $SA_KEY_ID $DTE $SA_KEY_EXPIRES_AT"
     else
-        echo "$CRD $A - - - - - - -"
+        echo "$CRD $A - - - - -"
     fi
 }
 
@@ -447,7 +447,7 @@ function sa_keys_report() {
 function sa_key_iterator() {
 
    fiterator=$1
-   report="CRD AD/T SECRET_NAME SA_ID SA_KEY_ID DTE EXPIRES_AT"$'\n'
+   report="KIND RESOURCE SECRET_NAME SA_ID SA_KEY_ID DTE EXPIRES_AT"$'\n'
 
 # 1.4.x
 
@@ -462,7 +462,7 @@ function sa_key_iterator() {
         AD=$sa_id-$(get_org_env_sha "$ORG" "")
         SECRET_NAME=$AD-svc-account
 
-        printf " AD/$sa_id"
+        printf " $ORG:AD/$sa_id"
 
 
         report=$report$($fiterator "AD" "$AD" "$SECRET_NAME")$'\n'
@@ -475,7 +475,7 @@ function sa_key_iterator() {
             AD=$sa_id-$(get_org_env_sha "$ORG" "$env")
             SECRET_NAME=$AD-svc-account
 
-            printf " AD/$sa_id"
+            printf " $env:AD/$sa_id"
 
             if kubectl get secret -n apigee "$SECRET_NAME" > /dev/null 2>&1; then
                 report=$report$($fiterator "AD" "$AD" "$SECRET_NAME")$'\n'
@@ -500,7 +500,7 @@ function sa_key_iterator() {
         report=$report$($fiterator "AT" "$AT" "$SECRET_NAME")$'\n'
     done
 
-    printf "\n\n"
+    printf "\n"
     echo "$report" | column -t
 }
 
@@ -806,7 +806,7 @@ elif [ "$action" = "sa-keys-rotate" ]; then
         echo "$key"
     }
 
-    echo "ahr-sa-ctl: INFO Service account keys directory: $SA_DIR"
+    printf "ahr-sa-ctl: INFO Service account keys directory: $SA_DIR\n"
 
     declare -A ads
 
@@ -815,6 +815,9 @@ elif [ "$action" = "sa-keys-rotate" ]; then
 
     declare -A dss
 
+    report="KIND RESOURCE DTE SA_EMAIL SA_KEY_ID EXPIRES_AT"$'\n'
+
+    printf "Processing:"
     # ApigeeDeployment
     for ad in $(kubectl get -n apigee ad -o json|jq .items[].metadata.name -r); do
         sn=$(kubectl -n apigee get ad $ad -o json|jq '.spec.template.spec.volumes[]|select(.name|contains("svc-account-volume")).secret.secretName // empty' -r)
@@ -824,7 +827,8 @@ elif [ "$action" = "sa-keys-rotate" ]; then
             if [ "$key" ]; then
                 read sa_email sa_id sa_key_id sa_key_expires_at sa_key_dte < <(get_sa_key_properties "$key")
 
-                echo "SA Key for AD: $ad $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"
+                printf " AD/$sa_id"
+                report=$report"AD $ad $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"$'\n'
 
                 if [ ! "${ids[$sa_id]}" ]; then
                     ids[$sa_id]="$sa_email"
@@ -835,7 +839,7 @@ elif [ "$action" = "sa-keys-rotate" ]; then
                 echo "ERROR: key for AD "$AD" is not recoverable it might not exist; configure it using ....."
             fi
         else
-            echo "SA Key for AD: $ad - - - -"
+            report=$report"AD $ad - - - -"$'\n'
         fi
     done
 
@@ -847,7 +851,7 @@ elif [ "$action" = "sa-keys-rotate" ]; then
             if [ "$key" ]; then
                 read sa_email sa_id sa_key_id sa_key_expires_at sa_key_dte < <(get_sa_key_properties "$key")
 
-                echo "SA Key for DS: $ds $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"
+                report=$report"DS $ds $sa_key_dte $sa_email $sa_key_id $sa_key_expires_at"$'\n'
 
                 if [ ! "${ids[$sa_id]}" ]; then
                     ids[$sa_id]="$sa_email"
@@ -858,33 +862,35 @@ elif [ "$action" = "sa-keys-rotate" ]; then
                 echo "ERROR: key for DS "$ds" is not recoverable it might not exist; configure it using ....."
             fi
         else
-            echo "SA Key for DS: $ds - - - -"
+            report=$report"DS $ds - - - -"$'\n'
         fi
 
+    printf "\n"
+    echo "$report" | column -t
 
 if [ "$DEBUG" ]; then
 
 
-echo "ids[]"
+echo "ids[] List of Service Account IDs: SA_ID --> SA_EMAIL"
 for id in "${!ids[@]}"; do
     echo ": $id  ${ids[$id]}"
 done
 
 
-echo "sns[]"
+echo "sns[] List of Secret Names: RESOURCE --> SECRET_NAME"
 for sn in "${!sns[@]}"; do
     echo ": $sn ${sns[$sn]}"
 done
 
-echo "ads[]"
+echo "ads[] Service Account IDs: RESOURCE --> SA_ID"
 for ad in "${!ads[@]}"; do
     echo ": $ad ${ads[$ad]}"
 done
 
-echo "dss[]"
-for ds in "${!dss[@]}"; do
-    echo ": $ds ${dss[$ds]}"
-done
+# echo "dss[]"
+# for ds in "${!dss[@]}"; do
+#     echo ": $ds ${dss[$ds]}"
+# done
 
 
 
