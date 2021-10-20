@@ -98,7 +98,7 @@ eval set -- "$pps"
 #  * if --profiles is missing, report an error
 
 
-APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-distributed-trace"
+APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-distributed-trace,apigee-runtime"
 
 APIGEE_ASM_ROLES='roles/gkehub.connect'
 APIGEE_ASM_PERMS='"gkehub.endpoints.connect"'
