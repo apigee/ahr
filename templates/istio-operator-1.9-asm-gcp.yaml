@@ -1,0 +1,136 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: asm-gcp
+  hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
+  tag: $ASM_VERSION # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  meshConfig:
+    # This is for Apigee Distributed trace for ingress
+    enableTracing: true
+    # This disables Istio from configuring workloads for mTLS if TLSSettings are not specified. 1.4 defaulted to false.
+    enableAutoMtls: false
+    accessLogFile: "/dev/stdout"
+    accessLogEncoding: 1
+    # This is Apigee's custom access log format. Changes should not be made to this
+    # unless first working with the Data and AX teams as they parse these logs for
+    # SLOs.
+    accessLogFormat: '{"start_time":"%START_TIME%","remote_address":"%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%","user_agent":"%REQ(USER-AGENT)%","host":"%REQ(:AUTHORITY)%","request":"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%","request_time":"%DURATION%","status":"%RESPONSE_CODE%","status_details":"%RESPONSE_CODE_DETAILS%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","upstream_address":"%UPSTREAM_HOST%","upstream_response_flags":"%RESPONSE_FLAGS%","upstream_response_time":"%RESPONSE_DURATION%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_cluster":"%UPSTREAM_CLUSTER%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%","request_method":"%REQ(:METHOD)%","request_path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","request_protocol":"%PROTOCOL%","tls_protocol":"%DOWNSTREAM_TLS_VERSION%","request_id":"%REQ(X-REQUEST-ID)%","sni_host":"%REQUESTED_SERVER_NAME%","apigee_dynamic_data":"%DYNAMIC_METADATA(envoy.lua)%"}'
+    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
+    - "$PROJECT.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    trustDomain: "$PROJECT.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    defaultConfig:
+      proxyMetadata:
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/$PROJECT/locations/$CLUSTER_ZONE/clusters/$CLUSTER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GCP_METADATA: "$PROJECT|$PROJECT_NUMBER|$CLUSTER|$AX_REGION" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+        CA_PROVIDER: "GoogleCA"
+        PLUGINS: "GoogleTokenExchange"
+        USE_TOKEN_FOR_CSR: "true"
+        GCE_METADATA_HOST: "metadata.google.internal"
+    # Protocol detection timeout is not supported
+    protocolDetectionTimeout: 0s
+    # Locality load balancing is not supported
+    localityLbSetting:
+      enabled: false
+  components:
+    base:
+      enabled: true
+    egressGateways:
+    - enabled: false
+      name: istio-egressgateway
+      k8s:
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+    ingressGateways:
+    - enabled: true
+      name: istio-ingressgateway
+      k8s:
+        service:
+            type: LoadBalancer
+            loadBalancerIP: $RUNTIME_IP
+            ports:
+              - name: status-port
+                port: 15021
+                targetPort: 15021
+              - name: http2
+                port: 80
+                targetPort: 8080
+              - name: https
+                port: 443
+                targetPort: 8443
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+    # The default profile is tuned to fit on smaller clusters.
+    # Increase cpu req to ensure we can handle larger scale clusters.
+    pilot:
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: 500m
+        hpaSpec:
+          minReplicas: 2
+        replicaCount: 2
+        env:
+        - name: GKE_CLUSTER_URL
+          value: "https://container.googleapis.com/v1/projects/$PROJECT/locations/$CLUSTER_ZONE/clusters/$CLUSTER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        - name: GCP_METADATA
+          value: "$PROJECT|$PROJECT_NUMBER|$CLUSTER|$AX_REGION" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+        - name: SPIFFE_BUNDLE_ENDPOINTS
+          value: "$PROJECT.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
+        - name: ENABLE_STACKDRIVER_MONITORING
+          value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+        - name: TOKEN_AUDIENCES
+          value: "$PROJECT.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
+        - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+          value: "true"
+  values:
+    # Protocol sniffing is not supported
+    pilot:
+      enableProtocolSniffingForOutbound: false
+      enableProtocolSniffingForInbound: false
+    # Enable telemetry v2 backend by Stackdriver.
+    # Prometheus is also supported with --set values.telemetry.v2.prometheus.enabled=true --set prometheus.enabled=true
+    telemetry:
+      enabled: true
+      v2:
+        enabled: true
+        prometheus:
+          enabled: false
+        stackdriver:
+          enabled: true
+          inboundAccessLogging: "FULL"
+          outboundAccessLogging: "ERRORS_ONLY"
+          topology: true
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
+    global:
+      proxy:
+        tracer: stackdriver
+      caAddress: "meshca.googleapis.com:443"
+      pilotCertProvider: kubernetes
+      sts:
+        servicePort: 15463
+      sds:
+        token:
+          aud: "$PROJECT.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      multiCluster:
+        # Provided to ensure a human readable name rather than a UUID.
+        clusterName: "cn-$PROJECT-$REGION-$CLUSTER_NAME" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+      meshID: "proj-$PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
+      network: "$NETWORK" # {"$ref":"#/definitions/io.k8s.cli.substitutions.network"}

@@ -605,7 +605,7 @@ echo -e "Pre-flight checks and settings: gcp project; product versions; enabling
 
 
 
-export HYBRID_VERSION=${HYBRID_VERSION:-1.5.1}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.6.1}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 

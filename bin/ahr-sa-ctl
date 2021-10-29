@@ -97,8 +97,9 @@ eval set -- "$pps"
 #  * otherwise, use --profiles value
 #  * if --profiles is missing, report an error
 
-
-APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-distributed-trace"
+# 1.5 APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-distributed-trace"
+# 1.6
+APIGEE_SA_ALL="apigee-synchronizer,apigee-mart,apigee-udca,apigee-logger,apigee-metrics,apigee-watcher,apigee-cassandra,apigee-runtime"
 
 APIGEE_ASM_ROLES='roles/gkehub.connect'
 APIGEE_ASM_PERMS='"gkehub.endpoints.connect"'
@@ -132,9 +133,16 @@ APIGEE_CASSANDRA_ROLES='roles/storage.objectAdmin'
 APIGEE_CASSANDRA_PERMS='"resourcemanager.projects.get","resourcemanager.projects.list","storage.objects.*"'
 APIGEE_CASSANDRA_NAME='Cassandra Backups Service Account'
 
+# 1.5
 APIGEE_DISTRIBUTED_TRACE_ROLES='roles/cloudtrace.agent'
 APIGEE_DISTRIBUTED_TRACE_PERMS='"cloudtrace.traces.patch"'
 APIGEE_DISTRIBUTED_TRACE_NAME='Distributed Trace Service Account'
+
+# 1.6
+APIGEE_RUNTIME_ROLES='roles/cloudtrace.agent'
+APIGEE_RUNTIME_PERMS='"cloudtrace.traces.patch"'
+APIGEE_RUNTIME_NAME='Runtime Service Account'
+
 
 function show_help(){
 
@@ -142,7 +150,8 @@ function show_help(){
     echo ""
     echo " ahr-sa-ctl create|config|delete|rebind \$PROJECT_ID"
     echo ""
-    echo " <sa-id> -- all or [comma-separated combination of] apigee-synchronizer,apigee-mart,apigee-watcher,apigee-udca,apigee-logger,apigee-metrics,apigee-cassandra,apigee-distributed-trace"
+    echo " <sa-id> -- all or [comma-separated combination of] apigee-synchronizer,apigee-mart,apigee-watcher,apigee-udca,apigee-logger,apigee-metrics,apigee-cassandra,apigee-distributed-trace,apigee-runtime"
+    echo "  Note: 1.5: apigee-distributed-trace; 1.6: apigee-runtime"
     echo ""
     echo ""
     echo " ahr-sa-ctl create-sa all|<sa-id> [--force]"
