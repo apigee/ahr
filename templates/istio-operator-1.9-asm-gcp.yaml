@@ -131,6 +131,6 @@ spec:
           aud: "$PROJECT.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
-        clusterName: "cn-$PROJECT-$REGION-$CLUSTER_NAME" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+        clusterName: "cn-$PROJECT-$REGION-$CLUSTER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
       meshID: "proj-$PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       network: "$NETWORK" # {"$ref":"#/definitions/io.k8s.cli.substitutions.network"}

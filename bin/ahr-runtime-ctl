@@ -759,7 +759,7 @@ ahr-cluster-ctl asm-gke-configure "$ASM_VERSION_MINOR"
 if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
     istioctl manifest apply -f $ASM_CONFIG
 else # >= 1.6
-    istioctl install -f $ASM_CONFIG
+    istioctl install -f $ASM_CONFIG -y --verify
 fi
 
 

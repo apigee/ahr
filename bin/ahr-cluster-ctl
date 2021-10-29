@@ -153,7 +153,7 @@ elif [ "asm-get" == "$ACTION" ]; then
     fi
 
 
-check_envvars "HYBRID_HOME PLATFORM RUNTIME_CONFIG"
+check_envvars "HYBRID_HOME PLATFORM"
 
 mkdir -p $HYBRID_HOME
 cd $HYBRID_HOME
@@ -213,9 +213,9 @@ if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
 
 else # >= 1.6
 
-    export WORKLOAD_POOL=${PROJECT}.svc.id.goog
-
-    gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
+    # is not required as GKE cluster is created with workload identity configured
+    # export WORKLOAD_POOL=${PROJECT}.svc.id.goog
+    # gcloud container clusters update ${CLUSTER} --project=${PROJECT} --zone=$CLUSTER_ZONE --workload-pool=${WORKLOAD_POOL}
 
     response=$(curl -H "Authorization: Bearer $(token)" "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT}:initialize" --data '')
     check_already_exists "$response"
