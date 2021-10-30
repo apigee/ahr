@@ -1,0 +1,113 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# This sample is a good starting point for high performance environments including pre-production, production etc.
+# In addition to all the parameters in overrides-medium, customers can set parameters like encryption keys, passwords etc.
+# Individual components have a min of two replicas.
+#
+
+# GCP project name where the org is provisioned.
+gcp:
+  projectID: $PROJECT
+
+# Apigee org name.
+org: $ORG
+
+k8sCluster:
+  name: $CLUSTER
+  region: $REGION
+
+instanceID: "$CLUSTER-$REGION"
+
+
+virtualhosts:
+  - name: $ENV_GROUP
+    sslCertPath: $RUNTIME_SSL_CERT
+    sslKeyPath: $RUNTIME_SSL_KEY
+
+envs:
+  - name: $ENV
+    serviceAccountPaths:
+      synchronizer: $SYNCHRONIZER_SA
+      udca: $UDCA_SA
+
+# It is the best practice to schedule Cassandra workloads on the separate nodes.
+# This configuration allows you to specify labels (or node pools) for runtime
+# vs. Cassandra workloads.
+nodeSelector:
+  # This flag determines if the scheduling passes/fails if the labels are missing.
+  requiredForScheduling: false
+  apigeeRuntime:
+    key: "cloud.google.com/gke-nodepool"
+    value: "apigee-runtime"
+  apigeeData:
+    key: "cloud.google.com/gke-nodepool"
+    value: "apigee-data"
+
+synchronizer:
+  replicaCountMin: 2
+
+runtime:
+  replicaCountMin: 2
+  replicaCountMax: 20
+  resources:
+    cpu: 1000m
+    memory: 1Gi
+
+cassandra:
+#  auth:
+#    default:
+#      password: "enteryourpasswordhere"
+#    admin:
+#      password: "enteryourpasswordhere"
+#    ddl:
+#      password: "enteryourpasswordhere"
+#    dml:
+#      password: "enteryourpasswordhere"
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: $CASSANDRA_REQUESTS_CPU
+      memory: $CASSANDRA_REQUESTS_MEMORY
+  maxHeapSize: 8192M
+  heapNewSize: 1200M
+  storage:
+    # Create a storage class with SSD.
+    storageClass: pd-ssd
+    capacity: $CASSANDRA_STORAGE_CAPACITY
+
+udca:
+  replicaCountMin: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+mart:
+  replicaCountMin: 2
+  serviceAccountPath: $MART_SA
+
+connectAgent:
+  replicaCountMin: 3
+  serviceAccountPath: $MART_SA
+
+metrics:
+  serviceAccountPath: $METRICS_SA
+
+udca:
+  serviceAccountPath: $UDCA_SA
+
+watcher:
+  serviceAccountPath: $WATCHER_SA
