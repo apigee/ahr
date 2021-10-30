@@ -765,9 +765,7 @@ echo "Creating GKE Cluster using configuration: $CLUSTER_CONFIG..."
 # Create GKE cluster
 ahr-cluster-ctl template $CLUSTER_TEMPLATE > $CLUSTER_CONFIG
 
-set +e
 ahr-cluster-ctl create
-set -e
 
 fi
 
