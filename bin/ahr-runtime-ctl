@@ -230,6 +230,53 @@ ${@}
 fi 
 
 
+#-----------------------------------------------------------------------
+
+#
+# Generate source.env file
+#
+elif [ "gen-source-env" == "$ACTION" ]; then
+
+    check_envvars "PROJECT AHR_HOME HYBRID_HOME HYBRID_ENV ASM_VERSION APIGEECTL_HOME"
+
+
+  if [[ "$COMPS" =~ ";all;" ]]; then
+    echo -e "\nApigee Hybrid version $HYBRID_VERSION is installed.\n"
+  fi
+
+
+cat <<EOF > $HYBRID_HOME/source.env
+export AHR_HOME=$AHR_HOME
+export PATH=\$AHR_HOME/bin:\$PATH
+
+source \$AHR_HOME/bin/ahr-completion.bash
+
+export PROJECT=$PROJECT
+export HYBRID_HOME=$HYBRID_HOME
+export HYBRID_ENV=$HYBRID_ENV
+source \$HYBRID_ENV
+
+# for: bash: _get_comp_words_by_ref: command not found
+#    sudo apt -y install bash-completion
+#    source ~/.profile
+alias k=kubectl
+source <(kubectl completion bash)
+complete -F __start_kubectl k
+
+export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
+export PATH=\$ASM_HOME/bin:\$PATH
+
+source \$ASM_HOME/tools/istioctl.bash
+
+export APIGEECTL_HOME=$APIGEECTL_HOME
+export PATH=\$APIGEECTL_HOME:\$PATH
+
+EOF
+
+echo "To set up your hybrid environment and deploy a ping proxy:"
+echo "  source $HYBRID_HOME/source.env"
+echo "  \$AHR_HOME/proxies/deploy.sh"
+
 
 #-----------------------------------------------------------------------
 
@@ -509,6 +556,10 @@ elif [ "ad-rollout-restart" == "$ACTION" ]; then
 
     kubectl -n $NS patch ad $AD -p '{"release":{"replaceWithClone":true}}' --type=merge
 
+
+
+
+
 #-----------------------------------------------------------------------
 elif [ "install-profile" == "$ACTION" ]; then
     if [ "$#" -lt 3 ]; then
@@ -524,7 +575,8 @@ elif [ "install-profile" == "$ACTION" ]; then
         echo "Supported hybrid profiles: small    single-zone, small runtime"
         echo "                           large    multi-zone, large runtime"
         echo "Supported asm profiles: asm-gcp"
-        echo "Supported comma-separated components: cluster cert-manager gcp-ip istio apigee-org runtime "
+        echo "Supported comma-separated components: "
+        echo "    cluster cert-manager gcp-ip istio apigee-org get-apigeectl gen-source-env runtim-config runtime "
         echo ""
         echo "Override if you wish (ie, set up before calling the operation):"
         echo "    HYBRID_HOME HYBRID_VERSION"
@@ -541,6 +593,12 @@ pps=""
 
 #home for hybrid installation
 export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
+
+export HYBRID_VERSION=${HYBRID_VERSION:-1.6.1}
+
+export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
+
+
 
 # install all componenets by default
 COMPS=";all;"
@@ -600,17 +658,9 @@ if [[ "$COMPS" =~ ";all;" ]]; then
 
 echo -e "Pre-flight checks and settings: gcp project; product versions; enabling apis...\n"
 
-## Hybrid Install Environment bootstrapping and version selection persistance
 #
-
-
-
-export HYBRID_VERSION=${HYBRID_VERSION:-1.6.1}
-
-export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
-
-
-
+# Hybrid Install Environment bootstrapping and version selection persistance
+#
 
 mkdir -p $HYBRID_HOME
 
@@ -764,6 +814,30 @@ fi
 
 
 fi
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";get-apigeectl;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+    check_envvars "HYBRID_VERSION"
+
+source $HYBRID_ENV
+
+# Get Hybrid installation and set up APIGEECTL_HOME in PATH
+source <(ahr-runtime-ctl get-apigeectl)
+
+fi
+
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";gen-source-env;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+echo "AHR Profile: Generating source.env"
+
+source $HYBRID_ENV
+ahr-runtime-ctl gen-source-env
+
+fi
+
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";apigee-org;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
@@ -803,16 +877,13 @@ ahr-runtime-ctl template $RUNTIME_TEMPLATE > $RUNTIME_CONFIG
 
 fi
 
+
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";runtime;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-    check_envvars "HYBRID_VERSION RUNTIME_CONFIG"
+    check_envvars "RUNTIME_CONFIG"
 
 printf "\nAHR: Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG\n"
-
-
-# Get Hybrid installation and set up APIGEECTL_HOME in PATH
-source <(ahr-runtime-ctl get-apigeectl)
 
 
 # Install Hybrid runtime
@@ -829,50 +900,6 @@ ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 fi
 
-#-----------------------------------------------------------------------
-if [[ "$COMPS" =~ ";source-env;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
-
-    check_envvars "PROJECT AHR_HOME HYBRID_HOME HYBRID_ENV ASM_VERSION APIGEECTL_HOME"
-
-
-  if [[ "$COMPS" =~ ";all;" ]]; then
-    echo -e "\nApigee Hybrid version $HYBRID_VERSION is installed.\n"
-  fi
-
-
-cat <<EOF > $HYBRID_HOME/source.env
-export AHR_HOME=$AHR_HOME
-export PATH=\$AHR_HOME/bin:\$PATH
-
-source \$AHR_HOME/bin/ahr-completion.bash
-
-export PROJECT=$PROJECT
-export HYBRID_HOME=$HYBRID_HOME
-export HYBRID_ENV=$HYBRID_ENV
-source \$HYBRID_ENV
-
-# for: bash: _get_comp_words_by_ref: command not found
-#    sudo apt -y install bash-completion
-#    source ~/.profile
-alias k=kubectl
-source <(kubectl completion bash)
-complete -F __start_kubectl k
-
-export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
-export PATH=\$ASM_HOME/bin:\$PATH
-
-source \$ASM_HOME/tools/istioctl.bash
-
-export APIGEECTL_HOME=$APIGEECTL_HOME
-export PATH=\$APIGEECTL_HOME:\$PATH
-
-EOF
-
-echo "To set up your hybrid environment and deploy a ping proxy:"
-echo "  source $HYBRID_HOME/source.env"
-echo "  \$AHR_HOME/proxies/deploy.sh"
-
-fi
 
 #-----------------------------------------------------------------------
 else
