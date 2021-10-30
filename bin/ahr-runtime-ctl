@@ -271,11 +271,10 @@ source \$ASM_HOME/tools/istioctl.bash
 export APIGEECTL_HOME=$APIGEECTL_HOME
 export PATH=\$APIGEECTL_HOME:\$PATH
 
+# To set up your hybrid environment and deploy a ping proxy
+# source \$HYBRID_HOME/source.env
+# \$AHR_HOME/proxies/deploy.sh
 EOF
-
-echo "To set up your hybrid environment and deploy a ping proxy:"
-echo "  source $HYBRID_HOME/source.env"
-echo "  \$AHR_HOME/proxies/deploy.sh"
 
 
 #-----------------------------------------------------------------------
@@ -806,7 +805,11 @@ ahr-cluster-ctl asm-gke-configure "$ASM_VERSION_MINOR"
 # common
 if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
     istioctl manifest apply -f $ASM_CONFIG
-else # >= 1.6
+elif [ "$ASM_VERSION_MINOR" = "1.6" ] \
+  || [ "$ASM_VERSION_MINOR" = "1.7" ] \
+  || [ "$ASM_VERSION_MINOR" = "1.8" ] ; then
+    istioctl install -f $ASM_CONFIG -y
+else # >= 1.9
     istioctl install -f $ASM_CONFIG -y --verify
 fi
 

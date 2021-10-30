@@ -63,7 +63,7 @@ export CLUSTER_CONFIG=$HYBRID_HOME/cluster-sz.json
 export MACHINE_TYPE_DATA=${MACHINE_TYPE_DATA:-e2-standard-8}
 export MACHINE_TYPE_RUNTIME=${MACHINE_TYPE_RUNTIME:-e2-standard-4}
 
-export CLUSTER_VERSION=1.18
+export CLUSTER_VERSION=1.20
 
 export CLUSTER=hybrid-cluster
 export CLUSTER_ZONE=${ZONE}

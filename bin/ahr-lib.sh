@@ -56,6 +56,30 @@ function check_commands() {
     fi
 }
 
+function version_is_ge(){
+    # two number [major, minor] version compare: current vs target
+    # eg: 5.5[...], 4.3[.xxx]
+    # returns true if greater or equal
+
+    # prereqs: gawk
+
+    local ver_curr="$1"
+    local ver_tgt="$2"
+
+    is_ge=$( awk -v ver_curr="$ver_curr" -v ver_tgt="$ver_tgt" 'BEGIN{
+split( ver_curr, ver_curr_ar, "." )
+split( ver_tgt, ver_tgt_ar, "." )
+print( ver_curr_ar[1], ver_tgt_ar[1] )
+print( ver_curr_ar[2], ver_tgt_ar[2] )
+print( ( ver_curr_ar[1] > ver_tgt_ar[1] )?
+              "true":
+              ( ver_curr_ar[1] <  ver_tgt_ar[1] )?
+                  "false":
+                   ( ver_curr_ar[2] >= ver_tgt_ar[2] )? "true" : "false" )
+}' )
+    echo -n "$is_ge"
+}
+
 function check_gnu_date() {
 
     VERSION=$( set +e; date --version 2>&1; echo "$?" )
