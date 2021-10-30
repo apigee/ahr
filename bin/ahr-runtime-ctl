@@ -891,13 +891,20 @@ printf "\nAHR: Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG\n"
 
 ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
 
-echo "!!! Waiting hack: 30 secs"
+echo "Waiting: 30 secs..."
 sleep 30
 
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+
+echo "Waiting: 60 secs..."
+sleep 60
+
 ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+
+echo ""
+echo "Done"
 
 fi
 
