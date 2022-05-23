@@ -1,0 +1,618 @@
+#!/usr/bin/env bash
+
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+APIGEETOOL_5G_VERSION="0.1"
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" 
+
+
+function token { echo -n "$(gcloud config config-helper --force-auth-refresh | grep access_token | grep -o -E '[^ ]+$')" ; }
+
+function curl_exit_on_error() {
+    local json=$1
+
+    if [ ! "$( jq .error <<< "$json")" = null ]; then
+
+        >&2 echo -n "$response"
+
+        # "warnings": 404, 409
+        local errorCode=$( jq .error.code <<< "$json")
+        if [ "$errorCode" = 404 ] || [ "$errorCode" = 409 ]; then
+            :
+        else
+            return 5
+        fi
+    fi
+}
+
+
+function check_options() {
+    local varlist=$1
+
+    local varsnotset="F"
+
+    for v in $varlist; do
+        if [ -z "${!v}" ]; then
+            >&2 echo "ERROR: apigeetool: Required option/variable: $v is not provided."
+            varsnotset="T"
+        fi
+    done
+
+    if [ "$varsnotset" = "T" ]; then
+        >&2 echo ""
+        >&2 echo "ABEND. Please set up required opions."
+        return 1
+    fi
+}
+
+function check_commands() {
+    local comlist=$1
+
+    local comsnotset="F"
+
+    for c in $comlist; do
+        if ! [ -x "$(command -v $c)" ]; then
+            >&2 echo "ERROR: Required command is not on your PATH: $c."
+            comsnotset="T"
+        fi
+    done
+
+    if [ "$comsnotset" = "T" ]; then
+        >&2 echo ""
+        >&2 echo "ABEND. Please make sure required commands are set and accesible via PATH."
+        return 1
+    fi
+}
+
+
+
+# put items of the comma separated list into double quotes
+function quotes() {
+    echo "$1" | awk 'BEGIN{FS=",";OFS=","}{for(i=1;i<=NF;i++) $i="\""$i"\""; print}'
+}
+
+
+function show_help(){
+
+cat <<EOT
+apigeetool interface -- compatibility mode
+
+Apigee Hybrid Deploy Proxy utility
+
+Synopsis:
+
+   apigeetool ...-hybrid-deploy-proxy <api-name> <api-bundle-zip-file> [--org <org-name>] [--env <env-name>]
+
+    RUNTIME_HOST_ALIAS where the kvm-admin/v1/ proxy is expected to be deployed is not provided\n"
+
+   
+For options, either define environment varibles (uppercase) or use options notation (lowercase).
+If both are set, an option takes priority.
+
+Example
+   apigee-hybrid-deploy-proxy ping ping.zip
+
+EOT
+}
+
+set -e
+
+
+# options/variables
+
+pps=""
+
+# options
+while(($#)); do
+case "$1" in
+  --username|-u)
+    APIGEE_USERNAME="$2"
+
+    shift 2;;
+
+  -p)
+    APIGEE_PASSWORD="$2"
+
+    shift 2;;
+
+
+  -o|--organization)
+    ORG="$2"
+
+    shift 2;;
+
+  -e|--environment)
+    ENV="$2"
+
+    shift 2;;
+
+  # api -- used across operations;
+  --api)
+    api="$2"
+
+    shift 2;;
+
+  # name is used across objects
+  --name|-n)
+    name="$2"
+
+    shift 2;;
+
+  # directory is used across objects
+  --directory|-d)
+    directory="$2"
+
+    shift 2;;
+  # KVM Operations
+  --mapName|--entryName|--entryValue)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
+  --encrypted)
+    # for kvm
+    encrypted=true
+
+    shift 1;;
+
+  # Cache
+  -z)
+    # name for cache
+    cacheName="$2"
+
+    shift 2;;
+
+  --description)
+    DESCRIPTION="$2"
+
+    shift 2;;
+
+  --cacheExpiryByDate)
+    CACHEEXPIRYBYDATE="$2"
+
+    shift 2;;
+
+  --cacheExpiryInSecs)
+    CACHEEXPIRYINSECS="$2"
+
+    shift 2;;
+
+  # developer
+  --email|--firstName|--lastName|--userName)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
+  # application
+  --name|--email|--apiProducts)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
+  --json)
+    json=true
+    shift 1;;
+
+
+  # product
+  --productName|--displayName|--approvalType|--productDesc|--environments|--proxies|--scopes)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
+  # targetServer
+  --targetEnabled|--targetHost|--targetPort|--targetSSL|--targetServerName)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
+  --version)
+    version=true
+    shift 1;;
+
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+if [ ! -z "$version" ];then
+    echo "apigeetool: 5G; version: $APIGEETOOL_5G_VERSION"
+    exit 0
+fi
+
+export OP="$1"
+
+check_options "ORG"
+
+if [ "$OP" = "createcache" ] || [ "$OP" = "deletecache" ]; then
+
+    check_options "ENV cacheName"
+    echo ""
+
+    if [ "$OP" = "createcache" ]; then
+        # dummy operation: create cache is not supported in 5G
+        :
+
+    elif [ "$OP" = "deletecache" ]; then
+        check_commands "curl"
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/caches/$cacheName )
+
+        curl_exit_on_error "$response"
+    fi
+
+
+elif [ "$OP" = "createKVMmap" ] || [ "$OP" = "deleteKVMmap" ] \
+  || [ "$OP" = "addEntryToKVM" ] || [ "$OP" = "getKVMentry" ]; then
+
+    check_options "ENV mapName"
+    check_commands "curl"
+
+    # optional: --encrypted
+    if [ -z "$encrypted" ]; then
+       ENCRYPTED=false
+    fi
+
+    # create KVM
+    if [ "$OP" = "createKVMmap" ]; then
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/keyvaluemaps" \
+          --data-binary @- <<EOF
+{
+    "name": "$mapName",
+    "encrypted": $encrypted
+}
+EOF
+)
+        echo  "$response"
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "deleteKVMmap" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName )
+
+        echo  "$response"
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "addEntryToKVM" ]; then
+        check_options "RUNTIME_HOST_ALIAS entryName entryValue"
+
+        escapedEntryValue=$entryValue
+        escapedEntryValue=$(sed 's/"/\\"/g' <<<"$escapedEntryValue")
+        escapedEntryValue=$(sed 's/\\n/\\\\n/g' <<<"$escapedEntryValue")
+
+# TODO: doesn't work correctly for a single line with no EOL at the end
+        escapedEntryValue=$(awk '{printf("%s\\n",$0) }' <<<"$escapedEntryValue")
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          "https://$RUNTIME_HOST_ALIAS/kvm-admin/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries" \
+          --data-binary @- <<EOF
+{
+    "key": "$entryName",
+    "value": "$escapedEntryValue"
+}
+EOF
+)
+
+        echo  "$response"
+
+    elif [ "$OP" = "getKVMentry" ]; then
+        check_options "RUNTIME_HOST_ALIAS entryName"
+
+        response=$(curl --silent -X GET -H "Authorization: Bearer $(token)" \
+          "https://$RUNTIME_HOST_ALIAS/kvm-admin/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries/$entryName")
+
+        echo  "$response"
+    fi
+
+
+
+elif [ "$OP" = "createTargetServer" ] || [ "$OP" = "deleteTargetServer" ]; then
+
+    check_options "ENV targetServerName"
+    check_commands "curl"
+
+    # createTargetServer
+    if [ "$OP" = "createTargetServer" ]; then
+        check_options "targetEnabled targetHost targetPort"
+
+        if [ ! -z "$targetSSL" ]; then
+           targetSSLJSON=",\"sSLInfo\": {\"enabled\": $targetSSL}"
+        fi
+
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/targetservers \
+          --data-binary @- <<EOF
+{
+  "name": "$targetServerName",
+  "host": "$targetHost",
+  "port": $targetPort,
+  "isEnabled": $targetEnabled
+  $targetSSLJSON
+}
+EOF
+)
+        curl_exit_on_error "$response"
+
+
+# TODO:
+#  "description": string,
+#  "sSLInfo": {
+#    object (TlsInfo)
+#  },
+#  "protocol": enum (Protocol)
+
+    elif [ "$OP" = "deleteTargetServer" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/targetservers/$targetServerName )
+
+        curl_exit_on_error "$response"
+    fi
+
+
+elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
+
+    check_options "productName"
+    check_commands "curl"
+
+    # createProduct
+    if [ "$OP" = "createProduct" ]; then
+        check_options "environments proxies"
+
+        # optional: displayName approvalType productDesc scopes
+        if [ -z "$displayName" ]; then
+           displayName=$productName
+        fi
+        if [ -z "$approvalType" ]; then
+           approvalType=auto
+        fi
+TODO: check extra space in the scope var
+
+        scopesSTR=""
+        if [ -z "$scopes" ]; then
+           scopesSTR="\"$scopes\""
+        fi
+
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/apiproducts \
+          --data-binary @- <<EOF
+{
+  "name": "$productName",
+  "displayName": "$displayName",
+  "approvalType": "$approvalType",
+  "description": "$productDesc",
+  "environments": [
+    "$environments"
+  ],
+  "proxies": [
+    $(quotes "$proxies" )
+  ],
+  "scopes": [
+    $scopesSTR
+  ]
+}
+EOF
+)
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "deleteProduct" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/apiproducts/$productName )
+
+        curl_exit_on_error "$response"
+
+    fi
+
+
+elif [ "$OP" = "createDeveloper" ] || [ "$OP" = "deleteDeveloper" ]; then
+    check_options "email"
+    check_commands "curl"
+
+    # create Developer
+    if [ "$OP" = "createDeveloper" ]; then
+        check_options "firstName lastName userName"
+
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          "https://apigee.googleapis.com/v1/organizations/$ORG/developers" \
+          --data-binary @- <<EOF
+{
+  "email": "$email",
+  "firstName": "$firstName",
+  "lastName": "$lastName",
+  "userName": "$userName",
+}
+EOF
+)
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "deleteDeveloper" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/developers/$email )
+
+        curl_exit_on_error "$response"
+    fi
+
+elif [ "$OP" = "createApp" ] || [ "$OP" = "deleteApp" ]; then
+
+    check_options "name email"
+    # json -- optional; ignored; assumed
+    check_commands "curl"
+
+    # application
+    if [ "$OP" = "createApp" ]; then
+        check_options "apiProducts"
+
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/developers/$email/apps \
+          --data-binary @- <<EOF
+{
+  "name": "$name",
+  "apiProducts": [
+    $(quotes "$apiProducts" )
+  ]
+}
+EOF
+)
+        curl_exit_on_error "$response"
+        echo -n "$response"
+
+    elif [ "$OP" = "deleteApp" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/developers/$email/apps/$name )
+
+        curl_exit_on_error "$response"
+
+    fi
+
+
+elif [ "$OP" = "deployproxy" ] || [ "$OP" = "deploySharedflow" ] \
+  || [ "$OP" = "undeploy" ] || [ "$OP" = "undeploySharedflow" ] \
+  || [ "$OP" = "delete" ] || [ "$OP" = "deleteSharedflow" ]; then
+
+    # name via options
+    if [ ! -z "$name" ]; then
+         :
+    elif [ ! -z "$api" ]; then
+         name=$api
+    else
+       printf "ERROR: $kindName Name is not provided (ie: --name <$kind-name>)\n"
+       exit 1
+    fi
+
+
+    kind="api"
+    kinds="apis"
+    kindDir="apiproxy"
+    kindName="API Proxy"
+    if [ "$OP" = "deploySharedflow" ] || [ "$OP" = "undeploySharedflow" ] || [ "$OP" = "deleteSharedflow" ];then
+         kind="sharedflow"
+         kinds="sharedflows"
+         kindDir="sharedflowbundle"
+         kindName="Shared Flow"
+    fi
+
+
+    if [ "$OP" = "deployproxy" ] || [ "$OP" = "deploySharedflow" ]; then
+        check_options "ENV"
+        check_commands "curl zip"
+
+
+        if [ -z "$directory" ]; then
+            directory=$(pwd)
+        fi
+        echo "$kindName Directory: $directory"
+
+        # checks
+        if [ ! -d "$directory/$kindDir" ]; then
+            echo "ERROR: No $kindDir/ directory found in directory: $directory"
+            exit 4
+        fi
+
+        # import zip file
+        #  -F file=@$API_BUNDLE 
+        # import zip stream
+        response=$(cd $directory; zip -q -r - $kindDir \
+            | curl --silent -H "Authorization: Bearer $(token)" \
+            -F file=@- -X POST \
+            "https://apigee.googleapis.com/v1/organizations/$ORG/$kinds?action=import&name=$name" )
+
+        curl_exit_on_error "$response"
+
+        REV=$( jq -r '.revision' <<< "$response" )
+
+        # deploy
+        echo "Deploying $kindName: $name Revision: $REV to org: $ORG env: $ENV"
+        response=$(curl --silent -H "Authorization: Bearer $(token)" -X POST \
+            "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/$kinds/$name/revisions/$REV/deployments?override=true")
+        curl_exit_on_error "$response"
+
+        # wait till ready
+        echo -n "Checking Deployment Status"
+        STATUS=""
+        while [ "$STATE" != "READY" ]; do
+            STATE=$(curl --silent -H "Authorization: Bearer $(token)" \
+                "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/$kinds/$name/revisions/$REV/deployments" \
+                | jq -r '.state')
+            echo -n "."
+            sleep 5
+        done
+        echo -e "\n$kindName $name is deployed.\n"
+
+    elif [ "$OP" = "undeploy" ] || [ "$OP" = "undeploySharedflow" ]; then
+        check_options "ENV"
+
+        response=$(curl --silent -H "Authorization: Bearer $(token)" \
+            -X GET \
+            "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/$kinds/$name/deployments")
+        curl_exit_on_error "$response"
+
+        if [ "$( jq -r .deployments <<< "$response" )" = null ]; then
+           echo "$kidnName undeploy: no deployed revision."
+        else
+            REV=$( jq -r .deployments[].revision -r <<< $response )
+
+            response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+              -H "Content-Type:application/json" \
+              https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/$kinds/$name/revisions/$REV/deployments )
+
+            curl_exit_on_error "$response"
+
+            echo "Successfully undeployed $kindName: $name, Revision: $REV"
+        fi
+
+    elif [ "$OP" = "delete" ] || [ "$OP" = "deleteSharedflow" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/$kinds/$name )
+
+        curl_exit_on_error "$response"
+
+        echo "Successfully deleted $kindName: $name"
+    fi
+
+
+elif [ "$OP" = "version" ];then
+    echo "apigeetool: 5G; version: $VERSION"
+
+else
+    echo "apigeetool ERROR: Unknown Operation: $OP"
+    exit 9
+fi
