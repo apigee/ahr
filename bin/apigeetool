@@ -209,6 +209,13 @@ case "$1" in
     json=true
     shift 1;;
 
+  # dataCollectort
+  --dataCollectorName|--dataCollectorType)
+    var="${1##--}"
+    printf -v "$var" "%s" "$2"
+
+    shift 2;;
+
 
   # product
   --productName|--displayName|--approvalType|--productDesc|--environments|--proxies|--scopes)
@@ -606,6 +613,47 @@ elif [ "$OP" = "deployproxy" ] || [ "$OP" = "deploySharedflow" ] \
         curl_exit_on_error "$response"
 
         echo "Successfully deleted $kindName: $name"
+    fi
+
+
+
+elif [ "$OP" = "createDataCollector" ] || [ "$OP" = "deleteDataCollector" ]; then
+
+    check_options "dataCollectorName"
+    check_commands "curl"
+
+
+
+    # createTargetServer
+    if [ "$OP" = "createDataCollector" ]; then
+        check_options "dataCollectorType"
+
+        # optional: displayName approvalType productDesc scopes
+        if [ -z "$dataCollectorDescription" ]; then
+           dataCollectorDescription="$dataCollectorName Data Collector"
+        fi
+
+        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/datacollectors \
+          --data-binary @- <<EOF
+{
+  "name": "$dataCollectorName",
+  "description": "$dataCollectorDescription",
+  "type": "$dataCollectorType"
+}
+EOF
+)
+        curl_exit_on_error "$response"
+
+
+    elif [ "$OP" = "deleteDataCollector" ]; then
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/datacollectors/$dataCollectorName )
+
+        curl_exit_on_error "$response"
     fi
 
 
