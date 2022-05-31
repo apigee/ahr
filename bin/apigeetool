@@ -251,7 +251,11 @@ export OP="$1"
 
 check_options "ORG"
 
-if [ "$OP" = "createcache" ] || [ "$OP" = "deletecache" ]; then
+if [ "$OP" = "getToken" ]; then
+
+    echo -n "$(token)"
+
+elif [ "$OP" = "createcache" ] || [ "$OP" = "deletecache" ]; then
 
     check_options "ENV cacheName"
     echo ""
@@ -401,7 +405,7 @@ elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
         if [ -z "$approvalType" ]; then
            approvalType=auto
         fi
-TODO: check extra space in the scope var
+# TODO: check extra space in the scope var
 
         scopesSTR=""
         if [ -z "$scopes" ]; then
