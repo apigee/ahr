@@ -266,7 +266,7 @@ complete -F __start_kubectl k
 export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
 export PATH=\$ASM_HOME/bin:\$PATH
 
-source \$ASM_HOME/tools/istioctl.bash
+# source \$ASM_HOME/tools/istioctl.bash
 
 export APIGEECTL_HOME=$APIGEECTL_HOME
 export PATH=\$APIGEECTL_HOME:\$PATH
@@ -782,14 +782,16 @@ fi
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-    check_envvars "PROJECT ASM_VERSION HYBRID_HOME ASM_HOME"
-    check_commands "asmcli"
+    check_envvars "PROJECT ASM_VERSION HYBRID_HOME"
 
 
 echo "ASM version: $ASM_VERSION"
 
 # Get ASM and add _HOME to PATH
 source <(ahr-cluster-ctl asm-get $ASM_VERSION)
+
+check_envvars "ASM_HOME"
+check_commands "asmcli"
 
 
 # Use supplied istio-operator.yaml 
@@ -906,19 +908,19 @@ printf "\nAHR: Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG\n"
 
 # Install Hybrid runtime
 
-ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
 
 echo "Waiting: 30 secs..."
 sleep 30
 
-ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
-ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
 
 echo "Waiting: 60 secs..."
 sleep 60
 
-ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
 echo ""
 echo "Done"
