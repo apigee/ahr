@@ -71,11 +71,11 @@ split( ver_curr, ver_curr_ar, "." )
 split( ver_tgt, ver_tgt_ar, "." )
 #print( ver_curr_ar[1], ver_tgt_ar[1] )
 #print( ver_curr_ar[2], ver_tgt_ar[2] )
-print( ( ver_curr_ar[1] > ver_tgt_ar[1] )?
-              "true":
-              ( ver_curr_ar[1] <  ver_tgt_ar[1] )?
-                  "false":
-                   ( ver_curr_ar[2] >= ver_tgt_ar[2] )? "true" : "false" )
+print( ( ver_curr_ar[1] > ver_tgt_ar[1] )? \
+              "true": \
+              ( ver_curr_ar[1] <  ver_tgt_ar[1] )? \
+                  "false": \
+                   ( ver_curr_ar[2] >= ver_tgt_ar[2] )? "true" : "false" ) \
 }' )
     echo -n "$is_ge"
 }
