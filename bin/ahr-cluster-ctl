@@ -39,7 +39,7 @@ if [ "create" == "$ACTION" ]; then
 
 
 check_envvars "CLUSTER CLUSTER_CONFIG CLUSTER_ZONE CONTEXT PROJECT"
-check_commands "jq kubectl"
+check_commands "jq kubectl google-cloud-sdk-gke-gcloud-auth-plugin gcloud"
 
 if [ ! -f "$CLUSTER_CONFIG" ]; then
     echo "Cluster file doesn't exist: $CLUSTER_CONFIG"
@@ -156,6 +156,32 @@ elif [ "asm-get" == "$ACTION" ]; then
 
 check_envvars "HYBRID_HOME PLATFORM"
 
+
+if $(version_is_ge "$ASM_VERSION" "1.10.7"); then
+
+# define ASM_HOME
+export ASM_HOME=$HYBRID_HOME/asm-$ASM_VERSION
+
+mkdir -p $ASM_HOME/bin
+cd $ASM_HOME/bin
+
+# get asmcli
+ASM_VERSION_MINOR=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
+ASMCLI_URL=https://storage.googleapis.com/csm-artifacts/asm/asmcli_$ASM_VERSION_MINOR
+
+echo $ASM_VERSION_MINOR
+echo $ASMCLI_URL
+
+curl --silent $ASMCLI_URL > asmcli
+chmod +x asmcli
+
+
+#asmcli validate --platform ASM_PLATFORM --output_dir $ASM_HOME --cluster_location $CLUSTER_ZONE --cluster_name $CLUSTER --project_id $PROJECT
+
+
+else
+
+
 mkdir -p $HYBRID_HOME
 cd $HYBRID_HOME
 
@@ -179,6 +205,9 @@ git clone --single-branch --branch $ASM_PACKAGE_VERSION_MINOR https://github.com
 
 # define ASM_HOME
 export ASM_HOME=$HYBRID_HOME/$(tar tf $HYBRID_HOME/$ASM_TARBALL | grep LICENSE | cut -d "/" -f 1)
+
+
+fi
 
 export PATH=$ASM_HOME:$PATH
 

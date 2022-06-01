@@ -593,7 +593,7 @@ pps=""
 #home for hybrid installation
 export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
 
-export HYBRID_VERSION=${HYBRID_VERSION:-1.6.1}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.7.0}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 
@@ -782,7 +782,8 @@ fi
 #-----------------------------------------------------------------------
 if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
-    check_envvars "PROJECT ASM_VERSION HYBRID_HOME"
+    check_envvars "PROJECT ASM_VERSION HYBRID_HOME ASM_HOME"
+    check_commands "asmcli"
 
 
 echo "ASM version: $ASM_VERSION"
@@ -805,12 +806,28 @@ ahr-cluster-ctl asm-gke-configure "$ASM_VERSION_MINOR"
 # common
 if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
     istioctl manifest apply -f $ASM_CONFIG
+    
 elif [ "$ASM_VERSION_MINOR" = "1.6" ] \
   || [ "$ASM_VERSION_MINOR" = "1.7" ] \
   || [ "$ASM_VERSION_MINOR" = "1.8" ] ; then
     istioctl install -f $ASM_CONFIG -y
-else # >= 1.9
+    
+elif [ "$ASM_VERSION_MINOR" = "1.9" ]; then
     istioctl install -f $ASM_CONFIG -y --verify
+    
+else # >= 1.10
+    ASM_PLATFORM="${ASM_PROFILE#*-}"
+
+    asmcli install \
+      --verbose \
+      --platform $ASM_PLATFORM \
+      --project_id $PROJECT \
+      --cluster_name $CLUSTER \
+      --cluster_location $CLUSTER_ZONE \
+      --output_dir $ASM_HOME \
+      --custom_overlay $ASM_CONFIG \
+      --enable_all \
+      --option legacy-default-ingressgateway
 fi
 
 
