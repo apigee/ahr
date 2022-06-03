@@ -222,6 +222,25 @@ while [[ "$(kubectl get deployment  -n apigee-system apigee-controller-manager -
 done
 printf " Ready\n"
 
+
+elif [[ " ${@} " =~ "apigeectl init" ]]; then
+
+
+printf "While not success: "
+    bash <<T
+while true; do
+    exit_code=\$(${@}; echo \$?)
+    if [ \$exit_code -ne 0 ]; then
+        echo -e "\n\nExit code: $exit_code. Wait for 30 secs..."
+        sleep 30
+    else
+        echo ""
+        break
+    fi
+done
+T
+
+
 else 
 #    exit_code=
 ${@}
