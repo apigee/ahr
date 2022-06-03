@@ -28,9 +28,6 @@ spec:
             type: LoadBalancer
             loadBalancerIP: $RUNTIME_IP
             ports:
-              - name: status-port
-                port: 15021
-                targetPort: 15021
               - name: http2
                 port: 80
                 targetPort: 8080

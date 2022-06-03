@@ -780,7 +780,7 @@ kubectl apply --validate=false -f $CERT_MANAGER_MANIFEST > /dev/null
 fi
 
 #-----------------------------------------------------------------------
-if [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+if [[ "$COMPS" =~ ";istio-config;" ]] || [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
 
     check_envvars "PROJECT ASM_VERSION HYBRID_HOME"
 
@@ -791,7 +791,6 @@ echo "ASM version: $ASM_VERSION"
 source <(ahr-cluster-ctl asm-get $ASM_VERSION)
 
 check_envvars "ASM_HOME"
-check_commands "asmcli"
 
 
 # Use supplied istio-operator.yaml 
@@ -805,19 +804,37 @@ ahr-cluster-ctl template $AHR_HOME/templates/istio-operator-$ASM_VERSION_MINOR-$
 ahr-cluster-ctl asm-gke-configure "$ASM_VERSION_MINOR"
 
 
+fi 
+
+#-----------------------------------------------------------------------
+if [[ "$COMPS" =~ ";istio-install;" ]] || [[ "$COMPS" =~ ";istio;" ]] || [[ "$COMPS" =~ ";all;" ]]; then
+
+    check_envvars "ASM_CONFIG"
+
+export ASM_VERSION_MINOR=$(echo "$ASM_VERSION"|awk '{sub(/\.[0-9]+-asm\.[0-9]+/,"");print}')
+
 # common
 if [ "$ASM_VERSION_MINOR" = "1.5" ]; then
+    check_commands "istioctl"
+
     istioctl manifest apply -f $ASM_CONFIG
     
 elif [ "$ASM_VERSION_MINOR" = "1.6" ] \
   || [ "$ASM_VERSION_MINOR" = "1.7" ] \
   || [ "$ASM_VERSION_MINOR" = "1.8" ] ; then
+    check_commands "istioctl"
+
     istioctl install -f $ASM_CONFIG -y
     
 elif [ "$ASM_VERSION_MINOR" = "1.9" ]; then
+    check_commands "istioctl"
+
     istioctl install -f $ASM_CONFIG -y --verify
     
 else # >= 1.10
+    check_envvars "PROJECT ASM_VERSION ASM_HOME ASM_CONFIG ASM_PROFILE CLUSTER CLUSTER_ZONE"
+    check_commands "asmcli"
+
     ASM_PLATFORM="${ASM_PROFILE#*-}"
 
     asmcli install \

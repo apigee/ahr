@@ -26,8 +26,9 @@ spec:
             type: LoadBalancer
             loadBalancerIP: $RUNTIME_IP # If you do not have a reserved static IP, leave this out.
             ports:
-              - name: http-status-port
+              - name: status-port
                 port: 15021
+                targetPort: 15021
               - name: http2
                 port: 80
                 targetPort: 8080
