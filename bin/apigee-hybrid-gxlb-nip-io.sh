@@ -18,15 +18,16 @@
 # Overlay GXLB with nip.io for a GKE hybrid install
 #
 
+set -e
 
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 . $BASEDIR/ahr-lib.sh
 
 
 # parameter: Apigee Environement Group
-ORG=$1
-ENV_GROUP=$2
-ASM_CONFIG=$3
+#ORG=$1
+#ENV_GROUP=$2
+#ASM_CONFIG=$3
 
 check_envvars "APIGEECTL_HOME HYBRID_HOME ORG ENV_GROUP ASM_CONFIG"
 check_commands "kubectl asmcli yq"
@@ -34,7 +35,6 @@ check_commands "kubectl asmcli yq"
 
 # Define a secret for non-SNI ApigeeRoute
 export TLS_SECRET=$ORG-$ENV_GROUP
-
 
 # Manifest for apigee-route-non-sni ApigeeRoute
 
@@ -131,13 +131,17 @@ EOF
 
 kubectl apply -f $HYBRID_HOME/ingress-backendconfig.yaml
 
+
 #
 # Global IP Address and GTM Host Name
 #
 
 export GTM_VIP=ingress-ip
 
+# skip if exists
+set +e
 gcloud compute addresses create $GTM_VIP --global
+set -e
 
 # nip.io proof-of-ownership service for our provisioned certificate.
 
@@ -214,12 +218,15 @@ kubectl describe ingress gke-ingress -n istio-system
 # Check istio ready
 # kubectl wait --for=condition=available --timeout=600s deployment --all -n istio-system
 
-# Check certificate status
+echo "# To Check certificate status:
 kubectl describe managedcertificate apigee-ssl-cert -n istio-system
 
-# ingress status
+# To check ingress status:
 kubectl describe ingress gke-ingress -n istio-system
 
-# test request
+# NOTE: it takes 8-15 minutes to provision a certificate
+"
+
+echo "Test request:"
 echo "curl https://$GTM_HOST_ALIAS/ping"
 

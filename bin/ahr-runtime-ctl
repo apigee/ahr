@@ -282,7 +282,8 @@ alias k=kubectl
 source <(kubectl completion bash)
 complete -F __start_kubectl k
 
-export ASM_HOME=$HYBRID_HOME/istio-$ASM_VERSION
+# TODO: convert to a operation call
+export ASM_HOME=$HYBRID_HOME/asm-$ASM_VERSION
 export PATH=\$ASM_HOME/bin:\$PATH
 
 # source \$ASM_HOME/tools/istioctl.bash
