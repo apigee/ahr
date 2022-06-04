@@ -223,13 +223,13 @@ done
 printf " Ready\n"
 
 
-elif [[ " ${@} " =~ "apigeectl init" ]]; then
+elif [[ " ${@} " =~ "--repeat-until-success" ]]; then
 
 
 printf "While not success: "
     bash <<T
 while true; do
-    exit_code=\$(${@}; echo \$?)
+    exit_code=\$(${@/--repeat-until-success/}; echo \$?)
     if [ \$exit_code -ne 0 ]; then
         echo -e "\n\nExit code: $exit_code. Wait for 30 secs..."
         sleep 30
@@ -945,14 +945,14 @@ printf "\nAHR: Deploy Hybrid Runtime using configuration: $RUNTIME_CONFIG\n"
 
 # Install Hybrid runtime
 
-time ahr-runtime-ctl apigeectl init -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl init --repeat-until-success -f $RUNTIME_CONFIG
 
 echo "Waiting: 30 secs..."
 sleep 30
 
 time ahr-runtime-ctl apigeectl wait-for-ready -f $RUNTIME_CONFIG
 
-time ahr-runtime-ctl apigeectl apply -f $RUNTIME_CONFIG
+time ahr-runtime-ctl apigeectl apply --repeat-until-success -f $RUNTIME_CONFIG 
 
 echo "Waiting: 60 secs..."
 sleep 60
