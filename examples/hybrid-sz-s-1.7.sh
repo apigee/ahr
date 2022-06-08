@@ -38,7 +38,7 @@ export ASM_CONFIG=$HYBRID_HOME/istio-operator.yaml
 #
 # Hybrid release configuration
 #
-export HYBRID_VERSION=${HYBRID_VERSION:-1.7.0}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.7.1}
 export APIGEECTL_TARBALL_URL=$(get_apigeectl_tarball_url "$HYBRID_VERSION" "$PLATFORM")
 export APIGEECTL_TARBALL=apigeectl_$(get_platform_suffix apigeectl "$PLATFORM")
 
