@@ -90,21 +90,23 @@ function show_help(){
 cat <<EOT
 apigeetool interface -- compatibility mode
 
-Apigee Hybrid Deploy Proxy utility
+apigeetool utility is a : cli-level compatible version of the original apigeetool written in nodejs,
+https://github.com/apigee/apigeetool-node
 
-Synopsis:
+It has same options and works with supports x/hybrid.
 
-   apigeetool ...-hybrid-deploy-proxy <api-name> <api-bundle-zip-file> [--org <org-name>] [--env <env-name>]
+Only subset of features is currently implemented.
 
-    RUNTIME_HOST_ALIAS where the kvm-admin/v1/ proxy is expected to be deployed is not provided\n"
-
+The tool wraps kvm-admin proxy for KVM-related operations.
    
 For options, either define environment varibles (uppercase) or use options notation (lowercase).
 If both are set, an option takes priority.
 
-Example
-   apigee-hybrid-deploy-proxy ping ping.zip
+Example:
 
+    apigeetool deployproxy -o $APIGEE_ORG -e $APIGEE_ENV -u $APIGEE_USER -p $APIGEE_PASSWORD -n $ap
+
+    RUNTIME_HOST_ALIAS where the kvm-admin/v1/ proxy is expected to be deployed is not provided\n"
 EOT
 }
 
