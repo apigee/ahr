@@ -410,7 +410,7 @@ elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
 # TODO: check extra space in the scope var
 
         scopesSTR=""
-        if [ -z "$scopes" ]; then
+        if [ -n "$scopes" ]; then
            scopesSTR="\"$scopes\""
         fi
 
