@@ -613,7 +613,7 @@ pps=""
 #home for hybrid installation
 export HYBRID_HOME=${HYBRID_HOME:-~/apigee-hybrid-install}
 
-export HYBRID_VERSION=${HYBRID_VERSION:-1.7.1}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.7.2}
 
 export HYBRID_ENV=$HYBRID_HOME/hybrid-$HYBRID_VERSION.env
 

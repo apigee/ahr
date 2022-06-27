@@ -29,7 +29,7 @@ export PLATFORM=${PLATFORM:-linux}  # linux | osx | win
 export CERT_MANAGER_MANIFEST=${CERT_MANAGER_MANIFEST:-https://github.com/jetstack/cert-manager/releases/download/v1.7.2/cert-manager.yaml}
 
 export ASM_PROFILE=${ASM_PROFILE:-asm-gcp}
-export ASM_VERSION=${ASM_VERSION:-1.12.6-asm.3}
+export ASM_VERSION=${ASM_VERSION:-1.13.4-asm.4}
 
 export ASM_TEMPLATE=$HYBRID_HOME/anthos-service-mesh-packages/asm/istio/istio-operator.yaml
 
@@ -38,7 +38,7 @@ export ASM_CONFIG=$HYBRID_HOME/istio-operator.yaml
 #
 # Hybrid release configuration
 #
-export HYBRID_VERSION=${HYBRID_VERSION:-1.7.1}
+export HYBRID_VERSION=${HYBRID_VERSION:-1.7.2}
 export APIGEECTL_TARBALL_URL=$(get_apigeectl_tarball_url "$HYBRID_VERSION" "$PLATFORM")
 export APIGEECTL_TARBALL=apigeectl_$(get_platform_suffix apigeectl "$PLATFORM")
 
