@@ -277,19 +277,32 @@ elif [ "$OP" = "createcache" ] || [ "$OP" = "deletecache" ]; then
     fi
 
 
-elif [ "$OP" = "createKVMmap" ] || [ "$OP" = "deleteKVMmap" ] \
-  || [ "$OP" = "addEntryToKVM" ] || [ "$OP" = "getKVMentry" ]; then
+elif [ "$OP" = "listKVMmap" ] \
+  || [ "$OP" = "createKVMmap" ] || [ "$OP" = "deleteKVMmap" ] \
+  || [ "$OP" = "addEntryToKVM" ] || [ "$OP" = "getKVMentry" ] || [ "$OP" = "deleteKVMentry" ]; then
 
-    check_options "ENV mapName"
+    check_options "ENV"
     check_commands "curl"
 
-    # optional: --encrypted
-    if [ -z "$encrypted" ]; then
-       ENCRYPTED=false
-    fi
+    # listcreate KVM
+    if [ "$OP" = "listKVMmap" ]; then
+
+        response=$(curl --silent -X GET -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/keyvaluemaps" )
+
+        curl_exit_on_error "$response"
+        echo  "$response"
 
     # create KVM
-    if [ "$OP" = "createKVMmap" ]; then
+    elif [ "$OP" = "createKVMmap" ]; then
+        check_options "mapName"
+
+        # optional: --encrypted
+        if [ -z "$encrypted" ]; then
+          encrypted=true
+        fi
+
         response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
           -H "Content-Type:application/json" \
           "https://apigee.googleapis.com/v1/organizations/$ORG/environments/$ENV/keyvaluemaps" \
@@ -304,6 +317,7 @@ EOF
         curl_exit_on_error "$response"
 
     elif [ "$OP" = "deleteKVMmap" ]; then
+        check_options "mapName"
 
         response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
           -H "Content-Type:application/json" \
@@ -313,34 +327,68 @@ EOF
         curl_exit_on_error "$response"
 
     elif [ "$OP" = "addEntryToKVM" ]; then
-        check_options "RUNTIME_HOST_ALIAS entryName entryValue"
+        check_options "mapName entryName entryValue"
+
+        MAPI_HOST_PATH="apigee.googleapis.com"
+        key="name"
+        if [ -z "$useKVMAdminProxy" ]; then
+          check_options "RUNTIME_HOST_ALIAS"
+          
+          MAPI_HOST_PATH="$RUNTIME_HOST_ALIAS/kvm-admin"
+          key="key"
+        fi
 
         escapedEntryValue=$entryValue
         escapedEntryValue=$(sed 's/"/\\"/g' <<<"$escapedEntryValue")
         escapedEntryValue=$(sed 's/\\n/\\\\n/g' <<<"$escapedEntryValue")
 
 # TODO: doesn't work correctly for a single line with no EOL at the end
-        escapedEntryValue=$(awk '{printf("%s\\n",$0) }' <<<"$escapedEntryValue")
+        #escapedEntryValue=$(awk '{printf("%s\\n",$0) }' <<<"$escapedEntryValue")
+
         response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
           -H "Content-Type:application/json" \
-          "https://$RUNTIME_HOST_ALIAS/kvm-admin/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries" \
+          "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries" \
           --data-binary @- <<EOF
 {
-    "key": "$entryName",
+    "$key": "$entryName",
     "value": "$escapedEntryValue"
 }
 EOF
 )
-
         echo  "$response"
+        curl_exit_on_error "$response"
 
     elif [ "$OP" = "getKVMentry" ]; then
-        check_options "RUNTIME_HOST_ALIAS entryName"
+        check_options "mapName entryName"
+
+        MAPI_HOST_PATH="apigee.googleapis.com"
+        if [ -z "$useKVMAdminProxy" ]; then
+          check_options "RUNTIME_HOST_ALIAS"
+          
+          MAPI_HOST_PATH="$RUNTIME_HOST_ALIAS/kvm-admin"
+        fi
 
         response=$(curl --silent -X GET -H "Authorization: Bearer $(token)" \
-          "https://$RUNTIME_HOST_ALIAS/kvm-admin/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries/$entryName")
+          "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries/$entryName")
 
         echo  "$response"
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "deleteKVMentry" ]; then
+        check_options "mapName entryName"
+
+        MAPI_HOST_PATH="apigee.googleapis.com"
+        if [ -z "$useKVMAdminProxy" ]; then
+          check_options "RUNTIME_HOST_ALIAS"
+          
+          MAPI_HOST_PATH="$RUNTIME_HOST_ALIAS/kvm-admin"
+        fi
+
+        response=$(curl --silent -X DELETE -H "Authorization: Bearer $(token)" \
+          "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries/$entryName")
+
+        echo  "$response"
+        curl_exit_on_error "$response"
     fi
 
 
@@ -391,7 +439,7 @@ EOF
     fi
 
 
-elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
+elif [ "$OP" = "createProduct" ] || [ "$OP" = "getProduct" ] || [ "$OP" = "deleteProduct" ]; then
 
     check_options "productName"
     check_commands "curl"
@@ -411,7 +459,7 @@ elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
 
         scopesSTR=""
         if [ -n "$scopes" ]; then
-           scopesSTR="\"$scopes\""
+           scopesSTR=$(quotes "$scopes" )
         fi
 
         response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
@@ -435,6 +483,16 @@ elif [ "$OP" = "createProduct" ] || [ "$OP" = "deleteProduct" ]; then
 }
 EOF
 )
+        echo "$response"
+        curl_exit_on_error "$response"
+
+    elif [ "$OP" = "getProduct" ]; then
+
+        response=$(curl --silent -X GET -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/apiproducts/$productName )
+
+        echo "$response"
         curl_exit_on_error "$response"
 
     elif [ "$OP" = "deleteProduct" ]; then
