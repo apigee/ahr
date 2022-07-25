@@ -345,16 +345,20 @@ EOF
 # TODO: doesn't work correctly for a single line with no EOL at the end
         #escapedEntryValue=$(awk '{printf("%s\\n",$0) }' <<<"$escapedEntryValue")
 
-        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
-          -H "Content-Type:application/json" \
-          "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries" \
-          --data-binary @- <<EOF
-{
-    "$key": "$entryName",
-    "value": "$escapedEntryValue"
-}
-EOF
-)
+       response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+         --data-urlencode key="$entryName" --data-urlencode value="$entryValue" \
+         "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries")
+
+#        response=$(curl --silent -X POST -H "Authorization: Bearer $(token)" \
+#          -H "Content-Type:application/json" \
+#          "https://$MAPI_HOST_PATH/v1/organizations/$ORG/environments/$ENV/keyvaluemaps/$mapName/entries" \
+#          --data-binary @- <<EOF
+#{
+#    "$key": "$entryName",
+#    "value": "$escapedEntryValue"
+#}
+#EOF
+#)
         echo  "$response"
         curl_exit_on_error "$response"
 
