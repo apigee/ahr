@@ -541,7 +541,7 @@ EOF
         curl_exit_on_error "$response"
     fi
 
-elif [ "$OP" = "createApp" ] || [ "$OP" = "deleteApp" ]; then
+elif [ "$OP" = "createApp" ] || [ "$OP" = "getApp" ] || [ "$OP" = "deleteApp" ]; then
 
     check_options "name email"
     # json -- optional; ignored; assumed
@@ -573,6 +573,15 @@ EOF
           https://apigee.googleapis.com/v1/organizations/$ORG/developers/$email/apps/$name )
 
         curl_exit_on_error "$response"
+
+    elif [ "$OP" = "getApp" ]; then
+
+        response=$(curl --silent -X GET -H "Authorization: Bearer $(token)" \
+          -H "Content-Type:application/json" \
+          https://apigee.googleapis.com/v1/organizations/$ORG/developers/$email/apps/$name )
+
+        curl_exit_on_error "$response"
+        echo -n "$response"
 
     fi
 
