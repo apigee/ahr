@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+AMU_VERSION="0.1"
+
+BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" 
+
+LIBDIR="$BASEDIR/../lib"
+
+
+# a very poor man's vendoring:
+function check_options() {
+    local varlist=$1
+
+    local varsnotset="F"
+
+    for v in $varlist; do
+        if [ -z "${!v}" ]; then
+            >&2 echo "ERROR: apigeetool: Required option/variable: $v is not provided."
+            varsnotset="T"
+        fi
+    done
+
+    if [ "$varsnotset" = "T" ]; then
+        >&2 echo ""
+        >&2 echo "ABEND. Please set up required opions."
+        return 1
+    fi
+}
+
+function check_commands() {
+    local comlist=$1
+
+    local comsnotset="F"
+
+    for c in $comlist; do
+        if ! [ -x "$(command -v $c)" ]; then
+            >&2 echo "ERROR: Required command is not on your PATH: $c."
+            comsnotset="T"
+        fi
+    done
+
+    if [ "$comsnotset" = "T" ]; then
+        >&2 echo ""
+        >&2 echo "ABEND. Please make sure required commands are set and accesible via PATH."
+        return 1
+    fi
+}
+
+
+
+set -e
+
+
+# options/variables
+
+pps=""
+
+# options
+while(($#)); do
+case "$1" in
+    -o|--org|--organization)
+    ORG="$2"
+
+    shift 2;;
+
+  -e|--env|--environment)
+    ENV="$2"
+
+    shift 2;;
+
+  # management API 
+  --cass-ip)
+    CASS_IP="$2"
+
+    shift 2;;
+
+  # api -- used across operations;
+  --api)
+    api="$2"
+
+    shift 2;;
+
+  # directories are used across objects
+  --emigrate-dir)
+    EMIGRATE_DIR="$2"
+
+    shift 2;;
+
+  --export-dir)
+    EXPORT_DIR="$2"
+
+    shift 2;;
+
+  --kek)
+    KEK="$2"
+
+    shift 2;;
+
+  --version)
+    version=true
+    shift 1;;
+
+  *)
+    pps="$pps $1"
+    shift;;
+esac
+done
+eval set -- "$pps"
+
+if [ ! -z "$version" ];then
+    echo "amu: 4G/5G; version: $AMU_VERSION"
+    exit 0
+fi
+
+export OBJECT=$1
+export ACTION=$2
+
+# defaults
+CASS_CLI=/opt/apigee/apigee-cassandra/bin/cassandra-cli
+CQLSH=/opt/apigee/apigee-cassandra/bin/cqlsh
+
+# emigrate an org, 4.50, 4.51
+# 
+
+
+
+
+
+
+if [ "$OBJECT" = "organizations" ]; then
+    # amu org list
+
+    if [ "$ACTION" = "list" ]; then
+        check_options "ORG CASS_IP"
+        check_commands "$CQLSH"
+
+        $CQLSH $CASS_IP -e "select key from kms.organizations;"
+    else
+        echo "ERROR: Unknown action: $ACTION"        
+    fi
+
+
+
+
+elif [ "$OBJECT" = "kvms" ]; then
+    # amu kvm export 
+    # amu kvm import 
+
+    check_options "ORG CASS_IP"
+    check_commands "$CASS_CLI"
+
+    if [ "$ACTION" = "emigrate" ]; then
+        check_options "EMIGRATE_DIR"
+
+        # at a cassandra node's VM:
+
+        echo -e "use keyvaluemap;\nget keyvaluemaps_r21[org];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
+
+    elif [ "$ACTION" = "export" ]; then
+        check_options "KEK EMIGRATE_DIR EXPORT_DIR"
+
+        # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
+    
+        $LIBDIR/amu-export-kvms.awk
+
+    fi
+
+elif [ "$OBJECT" = "keystores" ]; then
+
+
+# amu keystore emigrate --emigrate-dir --config-dir
+    echo "TODO"
+
+else 
+    echo "ERROR: Unknown object type: $OBJECT"
+
+fi
