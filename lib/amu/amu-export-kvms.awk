@@ -1,11 +1,11 @@
 #!/usr/bin/env awk
+
 BEGIN{
 
+    # stderr: cassandra-cli output for an org
     # expected variables:
-    # kek emigrate_dir export_dir
-    CONFIG_DIR = emigrate_dir
-
-
+    # kek export_dir
+    CONFIG_DIR = export_dir
 
 # scopes:
 # org: name=s@kvmaps:s@__ apigee__kvm__.keystore

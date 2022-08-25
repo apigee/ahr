@@ -192,10 +192,11 @@ elif [ "$OBJECT" = "kvms" ]; then
 
     elif [ "$ACTION" = "export" ]; then
         check_options "KEK EMIGRATE_DIR EXPORT_DIR"
+        check_commands "jq"
 
         # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
     
-        $LIBDIR/amu-export-kvms.awk -v emigrate_dir=$EMIGRATE_DIR/$ORG-kvms.out -v export_dir=$EXPORT_DIR -v kek=$KEK
+        awk -f $LIBDIR/amu-export-kvms.awk -v export_dir=$EXPORT_DIR -v kek=$KEK $EMIGRATE_DIR/$ORG-kvms.out
 
     fi
 
