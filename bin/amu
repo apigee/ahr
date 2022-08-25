@@ -18,7 +18,7 @@ AMU_VERSION="0.1"
 
 BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" 
 
-LIBDIR="$BASEDIR/../lib"
+LIBDIR="$BASEDIR/../lib/amu"
 
 
 # a very poor man's vendoring:
@@ -88,6 +88,18 @@ case "$1" in
 
     shift 2;;
 
+  # vault file path and name
+  --vault)
+    VAULT="$2"
+
+    shift 2;;
+
+  # vault file path and name
+  --storepass)
+    STOREPASS="$2"
+
+    shift 2;;
+
   # api -- used across operations;
   --api)
     api="$2"
@@ -154,7 +166,15 @@ if [ "$OBJECT" = "organizations" ]; then
     fi
 
 
+elif [ "$OBJECT" = "kek" ]; then
 
+    check_options "VAULT STOREPASS"
+
+    if [ "$ACTION" = "export" ]; then
+
+        KEK=$(cd $LIBDIR; java JKSExtractSKE $VAULT datastore-alias $STOREPASS $STOREPASS)
+        echo "$KEK"
+    fi
 
 elif [ "$OBJECT" = "kvms" ]; then
     # amu kvm export 
