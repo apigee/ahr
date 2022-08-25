@@ -102,9 +102,6 @@ The vault location and a keystore and secret password are soft-coded in /opt/api
 to extract a KEK for your installation, execute:
 
 ```sh
-vault.passphrase=CredentialUtil
-vault.filepath=
-
 STOREPASS=$(awk -F= '/^vault.passphrase/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
 VAULT=$(awk -F= '/^vault.filepath/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
 
