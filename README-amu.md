@@ -48,6 +48,8 @@ multiple options clutter the command line. for many common options it makes sens
 
 Also, you can re-use commands that operate in hybrid and opdk, if you configure opdk/hybrid values via env variables.
 
+Another important consideration to use environment variables is security: you do not want to flash the sensitive data at the terminal. Passing them implicitly allows you to avoid it.
+
 Those syntaxes are equivalent:
 
 implicit via env var
@@ -102,10 +104,10 @@ The vault location and a keystore and secret password are soft-coded in /opt/api
 to extract a KEK for your installation, execute:
 
 ```sh
-STOREPASS=$(awk -F= '/^vault.passphrase/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
-VAULT=$(awk -F= '/^vault.filepath/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
+export STOREPASS=$(awk -F= '/^vault.passphrase/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
+export VAULT=$(awk -F= '/^vault.filepath/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
 
-KEK=$(amu kek export)
+export KEK=$(amu kek export)
 
 ```
 

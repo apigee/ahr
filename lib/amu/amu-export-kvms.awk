@@ -1,9 +1,10 @@
 #!/usr/bin/env awk
 BEGIN{
 
-    CONFIG_DIR = "."
+    # expected variables:
+    # kek emigrate_dir export_dir
+    CONFIG_DIR = emigrate_dir
 
-    kek = "14DADC9F2E3E0D3CC774F07F5A0357F1"
 
 
 # scopes:
