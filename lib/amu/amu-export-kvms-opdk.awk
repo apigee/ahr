@@ -1,5 +1,7 @@
 #!/usr/bin/env awk
 
+@include "awk-lib.awk"
+
 BEGIN{
 
     # stderr: cassandra-cli output for an org
@@ -24,41 +26,6 @@ BEGIN{
     # kvmaps{}
 
 }
-
-function jqhas( json, property,     cmd ){
-
-    cmd = "echo '" json "' | jq 'has(\"" property "\")' -r"
-    cmd | getline result
-    close(cmd)
-    return result
-}
-
-function jqget( json, filter,     cmd ){
-
-    cmd = "echo '" json "' | jq '" filter "' -r"
-    cmd | getline result
-    close(cmd)
-    return result
-}
-
-function aesdecrypt( datab64, keyhex,     cmd ){
-
-    cmd = "echo " datab64 "| openssl enc -aes-128-ecb -d -K " keyhex " -base64"
-    cmd | getline result
-    close(cmd)
-
-    return result
-}
-
-function b64tohex( datab64,     cmd ){
-
-    cmd = "echo " datab64 "| base64 -d | xxd -ps"
-    cmd | getline result
-    close(cmd)
-
-    return result
-}
-
 
 /^=> \([^)]*\)$/{
 

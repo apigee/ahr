@@ -107,8 +107,14 @@ to extract a KEK for your installation, execute:
 export STOREPASS=$(awk -F= '/^vault.passphrase/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
 export VAULT=$(awk -F= '/^vault.filepath/{FS="=";print($2)}' /opt/apigee/edge-management-server/conf/credentials.properties)
 
-export KEK=$(amu kek export)
+export KEK=$(amu kek export --src $SRC --storepass $STOREPASS --vault VAULT)
 
+```
+
+## Hybrid: KEK
+
+```
+export KEK=$(amu kek export --src $SRC --org $ORG --env $ENV)
 ```
 
 

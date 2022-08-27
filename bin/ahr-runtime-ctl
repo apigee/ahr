@@ -43,6 +43,7 @@ function show_help(){
     echo "    ahr-runtime-ctl setproperty <property> <value>"
     echo ""
     echo "    ahr-runtime-ctl org-config"
+    echo "    ahr-runtime-ctl org-env-sha"
     echo "    ahr-runtime-ctl org-validate-name <org-name>"
     echo "    ahr-runtime-ctl org-create <org-name> --ax-region <ax-region>"
     echo "         ax-region: asia-east1 asia-northeast1 asia-southeast1"
@@ -399,6 +400,23 @@ curl -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" "htt
 
 echo "Sync Authorization:"
 curl -X POST -H "Authorization: Bearer $(token)" -H "Content-Type:application/json" "https://apigee.googleapis.com/v1/organizations/$ORG:getSyncAuthorization"
+
+#-----------------------------------------------------------------------
+elif [ "org-env-sha" == "$ACTION" ]; then
+    if [ "$#" -lt 3 ]; then
+        echo "ERROR: No org and env names are provided. For org only, use "" for env"
+        echo ""
+        show_help
+        exit 5
+    fi
+    ORG=$2
+    ENV=$3
+
+
+    check_envvars "ORG"
+    
+    echo $(get_org_env_sha $ORG $ENV)
+
 
 #-----------------------------------------------------------------------
 elif [ "org-validate-name" == "$ACTION" ]; then

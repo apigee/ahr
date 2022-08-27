@@ -60,6 +60,67 @@ function check_commands() {
     fi
 }
 
+function check_cqlsh() {
+
+    if kubectl get pods -n apigee cqlsh &> /dev/null; then
+        if [ "$(kubectl get pods -n apigee cqlsh -o jsonpath='{.status.phase}')" = 'Running' ]; then
+            return
+        else
+            kubectl delete pods -n apigee cqlsh
+        fi
+    fi
+
+# create cqlsh container
+cat <<'EOF' | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+  name: cqlsh
+  namespace: apigee
+spec:
+  containers:
+  - name: cqlsh
+    image: "gcr.io/apigee-release/hybrid/apigee-hybrid-cassandra-client:1.5.10"
+    imagePullPolicy: Always
+    command:
+    - sleep
+    - "3600"
+    env:
+    - name: APIGEE_DML_USER
+      valueFrom:
+        secretKeyRef:
+          key: dml.user
+          name: apigee-datastore-default-creds
+    - name: APIGEE_DML_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: dml.password
+          name: apigee-datastore-default-creds
+    volumeMounts:
+    - mountPath: /opt/apigee/ssl
+      name: tls-volume
+      readOnly: true
+  volumes:
+  - name: tls-volume
+    secret:
+      defaultMode: 420
+      secretName: apigee-cassandra-default-tls
+  restartPolicy: Never
+EOF
+
+kubectl wait --for=condition=ready -n apigee pod/cqlsh
+}
+
+function exec_cqlsh() {
+    local CQL=$1
+
+    check_cqlsh
+    
+    # kubectl exec -n apigee cqlsh -- bash -c "$CQLSH"
+    kubectl exec -n apigee cqlsh -- bash -c "$CQLSH -e \"$CQL\""
+}
+
 
 
 set -e
@@ -143,7 +204,7 @@ export ACTION=$2
 
 # defaults
 CASS_CLI=/opt/apigee/apigee-cassandra/bin/cassandra-cli
-CQLSH=/opt/apigee/apigee-cassandra/bin/cqlsh
+CQLSH='cqlsh apigee-cassandra-default.apigee.svc.cluster.local --ssl -u $APIGEE_DML_USER -p $APIGEE_DML_PASSWORD'
 
 # emigrate an org, 4.50, 4.51
 # 
@@ -157,10 +218,20 @@ if [ "$OBJECT" = "organizations" ]; then
     # amu org list
 
     if [ "$ACTION" = "list" ]; then
-        check_options "ORG CASS_IP"
-        check_commands "$CQLSH"
+        if [ "$SRC" = "opdk" ]; then
+            check_options "ORG CASS_IP"
+            check_commands "$CQLSH"
 
-        $CQLSH $CASS_IP -e "select key from kms.organizations;"
+            $CQLSH $CASS_IP -e "select key from kms.organizations;"
+
+        elif [ "$SRC" = "hybrid" ]; then
+
+            CQL="copy rtc_apigee_hybrid_org_hybrid.contract_ref(org,env) to stdout;"
+
+            exec_cqlsh "$CQL"
+        else
+            echo "ERROR: organizations list: unknown src: $SRC"
+        fi
     else
         echo "ERROR: Unknown action: $ACTION"        
     fi
@@ -168,35 +239,67 @@ if [ "$OBJECT" = "organizations" ]; then
 
 elif [ "$OBJECT" = "kek" ]; then
 
-    check_options "VAULT STOREPASS"
-
     if [ "$ACTION" = "export" ]; then
+        check_options "SRC"
 
-        KEK=$(cd $LIBDIR; java JKSExtractSKE $VAULT datastore-alias $STOREPASS $STOREPASS)
-        echo "$KEK"
+        if [ "SRC" = "opdk" ]; then
+            check_options "VAULT STOREPASS"
+
+            KEK=$(cd $LIBDIR; java JKSExtractSKE $VAULT datastore-alias $STOREPASS $STOREPASS)
+            echo "$KEK"
+        else 
+            # hybrid
+            check_options "SRC ENV"
+
+            secret="$(ahr-runtime-ctl org-env-sha $ORG "$ENV")-encryption-keys"
+            echo "$(kubectl -n apigee get secrets $secret --output 'jsonpath={.data.envKvmEncryptionKey}'|base64 -d|base64 -d |xxd -ps)"
+        fi
     fi
 
 elif [ "$OBJECT" = "kvms" ]; then
     # amu kvm export 
     # amu kvm import 
 
-    check_options "ORG CASS_IP"
-    check_commands "$CASS_CLI"
+    check_options "ORG SRC"
 
     if [ "$ACTION" = "emigrate" ]; then
         check_options "EMIGRATE_DIR"
 
         # at a cassandra node's VM:
 
-        echo -e "use keyvaluemap;\nget keyvaluemaps_r21[org];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
+        if [ "$SRC" = "opdk" ]; then
+            check_commands "$CASS_CLI  CASS_IP"
+
+            echo -e "use keyvaluemap;\nget keyvaluemaps_r21[org];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
+        elif [ "$SRC" = "hybrid" ]; then
+            # hybrid
+            check_commands "kubectl"
+
+            CQL="PAGING OFF; select * from kvm_${ORG//-/_}_hybrid.kvm_map_entry where tid = 'apigee-hybrid-org' allow filtering;"
+
+            exec_cqlsh "$CQL" > $EMIGRATE_DIR/$ORG-kvms.out
+        else
+            echo "ERROR: kvms emigrate: unknown src: $SRC"
+        fi
 
     elif [ "$ACTION" = "export" ]; then
-        check_options "KEK EMIGRATE_DIR EXPORT_DIR"
+        check_options "EMIGRATE_DIR EXPORT_DIR"
         check_commands "jq"
 
-        # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
-    
-        awk -f $LIBDIR/amu-export-kvms.awk -v export_dir=$EXPORT_DIR -v kek=$KEK $EMIGRATE_DIR/$ORG-kvms.out
+        if [ "SRC" = "opdk" ]; then
+            check_options "KEK"
+
+            # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
+        
+            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v kek=$KEK $EMIGRATE_DIR/$ORG-kvms.out
+
+            awk 'NF==19{print $1,$3, $5, $9, $19}' apigee-hybrid-org-kvms.out 
+        else 
+            # hybrid
+            DEK=$(amu kek export --src $SRC --org $ORG --env $ENV)
+echo $DEK            
+            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v dek=$DEK $EMIGRATE_DIR/$ORG-kvms.out
+        fi
 
     fi
 
