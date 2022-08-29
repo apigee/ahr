@@ -19,7 +19,11 @@ function aesdecrypt( datab64, keyhex,     cmd, result){
 
     cmd = "bash -c 'echo -n " datab64 "| openssl enc -aes-128-ecb -d -K " keyhex " -base64 -A'"
     result = ""
-    while( cmd | getline line ) result = result "\n" line
+    sep = ""
+    while( cmd | getline line ){
+        result = result sep line
+        sep="\n"
+    }
     close(cmd)
 
     return result
@@ -34,4 +38,18 @@ function b64tohex( datab64,     cmd, result ){
     return result
 }
 
+
+function ltrim( s ){ sub(/^[ ]+/, "", s); return s }
+
+function rtrim( s ){ sub(/[ ]+$/, "", s); return s }
+
+function trim( s ){ return rtrim(ltrim(s)); }
+
+
+function jsonescape( s ){ 
+    r = s
+    gsub( /"/, "\\\"", r)
+    gsub( /\n/, "\\n", r)
+    return r
+}
 

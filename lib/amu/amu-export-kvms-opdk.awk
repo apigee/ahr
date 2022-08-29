@@ -6,8 +6,8 @@ BEGIN{
 
     # stderr: cassandra-cli output for an org
     # expected variables:
-    # kek export_dir
-    CONFIG_DIR = export_dir
+    # KER EXPORT_DIR
+
 
 # scopes:
 # org: name=s@kvmaps:s@__ apigee__kvm__.keystore
@@ -43,7 +43,7 @@ BEGIN{
 
         dekb64 = jqget( keystore, ".[]|select(.name==\"key1\").value" )
 
-        dek = aesdecrypt( dekb64, kek )
+        dek = aesdecrypt( dekb64, KEK )
         dekhex = b64tohex( dek )
 
         keystores[ tokens["name"] ] = dekhex
@@ -131,11 +131,11 @@ print " folder: " folder
 
         json = "[ { \"entry\": " json ", \"name\": \"" kvm "\" } ]"
 
-        system( "mkdir -p " CONFIG_DIR folder)
 
-        file = CONFIG_DIR folder "/kvms.json"
+        file = EXPORT_DIR folder "/kvms.json"
 
         # catenate arrays in an var and a file
+        system( "mkdir -p " EXPORT_DIR folder)
         system( "echo '" json "' | if [ -f " file " ]; then cat - " file "; else cat -; fi |jq -s 'add' > " file ".tmp && mv " file ".tmp " file )
     }
 }
