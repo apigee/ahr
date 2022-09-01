@@ -308,6 +308,42 @@ elif [ "$OBJECT" = "keystores" ]; then
 # amu keystore emigrate --emigrate-dir --config-dir
     echo "TODO"
 
+
+elif [ "$OBJECT" = "cassandra" ]; then
+        check_options "ORG SRC BACKUP_DIR"
+
+    if [ "$ACTION" = "backup" ]; then
+        if [ "$SRC" = "opdk" ]; then
+
+            echo "TODO: [ ] "
+        elif [ "$SRC" = "hybrid" ]; then
+
+            # 
+            for kt in $(exec_cqlsh "copy system_schema.tables( keyspace_name, table_name ) to stdout;"); do
+                # keyspace="kvm_${ORG//-/_}_hybrid"
+                keyspace=$(echo $kt | awk -F, '{print $1}')
+                table=$(echo $kt | awk -F, '{print $2}')
+
+                if [ "$keyspace" = "system_distributed" ] \
+                || [ "$keyspace" = "system" ] \
+                || [ "$keyspace" = "system_traces" ]; then
+                    echo "SKIPPING: $keyspace    $table"
+                else
+
+                    echo "PROCESSING: $keyspace    $table"
+
+                    CQL="copy $keyspace.$table to '/tmp/$keyspace-$table.csv' with header = true;"
+                    exec_cqlsh "$CQL"
+
+                    kubectl cp apigee/cqlsh:/tmp/$keyspace-$table.csv $BACKUP_DIR/$keyspace-$table.csv
+                fi
+            done
+
+        fi
+    else
+        echo "ERROR: Unknown action: $ACTION"        
+    fi
+
 else 
     echo "ERROR: Unknown object type: $OBJECT"
 
