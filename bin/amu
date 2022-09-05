@@ -297,17 +297,17 @@ elif [ "$OBJECT" = "kvms" ]; then
         check_options "EMIGRATE_DIR EXPORT_DIR"
         check_commands "jq"
 
-        if [ "SRC" = "opdk" ]; then
+        if [ "$SRC" = "opdk" ]; then
             check_options "KEK"
 
             # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
         
             export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v KEK=$KEK $EMIGRATE_DIR/$ORG-kvms.out
-
-            awk 'NF==19{print $1,$3, $5, $9, $19}' apigee-hybrid-org-kvms.out 
         else 
             # hybrid
-            DEK=$(amu kek export --src $SRC --org $ORG --env $ENV)
+            check_options "DEK"
+
+            # DEK=$(amu kek export --src $SRC --org $ORG --env $ENV)
             export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v EXPORT_DIR=$EXPORT_DIR/$SRC -v DEK=$DEK $EMIGRATE_DIR/$ORG-kvms.out
         fi
 
@@ -317,7 +317,7 @@ elif [ "$OBJECT" = "keystores" ]; then
 
 
 # amu keystore emigrate --emigrate-dir --config-dir
-    echo "TODO"
+    echo "TODO: [ ] WIP"
 
 
 elif [ "$OBJECT" = "cassandra" ]; then
