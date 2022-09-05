@@ -149,6 +149,17 @@ case "$1" in
 
     shift 2;;
 
+  --src)
+    SRC="$2"
+
+    shift 2;;
+
+  --tgt)
+    TGT="$2"
+
+    shift 2;;
+
+
   # vault file path and name
   --vault)
     VAULT="$2"
@@ -275,7 +286,7 @@ elif [ "$OBJECT" = "kvms" ]; then
             # hybrid
             check_commands "kubectl"
 
-            CQL="PAGING OFF; select * from kvm_${ORG//-/_}_hybrid.kvm_map_entry where tid = 'apigee-hybrid-org' allow filtering;"
+            CQL="PAGING OFF; select * from kvm_${ORG//-/_}_hybrid.kvm_map_entry where tid = '" $ORG "' allow filtering;"
 
             exec_cqlsh "$CQL" > $EMIGRATE_DIR/$ORG-kvms.out
         else
