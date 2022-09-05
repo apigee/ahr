@@ -286,7 +286,7 @@ elif [ "$OBJECT" = "kvms" ]; then
             # hybrid
             check_commands "kubectl"
 
-            CQL="PAGING OFF; select * from kvm_${ORG//-/_}_hybrid.kvm_map_entry where tid = '" $ORG "' allow filtering;"
+            CQL="PAGING OFF; select * from kvm_${ORG//-/_}_hybrid.kvm_map_entry where tid = '${ORG}' allow filtering;"
 
             exec_cqlsh "$CQL" > $EMIGRATE_DIR/$ORG-kvms.out
         else
