@@ -294,7 +294,7 @@ elif [ "$OBJECT" = "kvms" ]; then
         fi
 
     elif [ "$ACTION" = "export" ]; then
-        check_options "EMIGRATE_DIR EXPORT_DIR"
+        check_options "EMIGRATE_DIR EXPORT_DIR TGT"
         check_commands "jq"
 
         if [ "$SRC" = "opdk" ]; then
@@ -302,13 +302,15 @@ elif [ "$OBJECT" = "kvms" ]; then
 
             # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
         
-            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v KEK=$KEK $EMIGRATE_DIR/$ORG-kvms.out
-        else 
+            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v TGT=$TGT -v KEK=$KEK $EMIGRATE_DIR/$ORG-kvms.out
+        elif [ "$SRC" = "hybrid" ]; then
             # hybrid
             check_options "DEK"
 
             # DEK=$(amu kek export --src $SRC --org $ORG --env $ENV)
-            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v EXPORT_DIR=$EXPORT_DIR/$SRC -v DEK=$DEK $EMIGRATE_DIR/$ORG-kvms.out
+            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v EXPORT_DIR=$EXPORT_DIR/$SRC -v TGT=$TGT -v DEK=$DEK $EMIGRATE_DIR/$ORG-kvms.out
+        else 
+            echo "ERROR: kvms emigrate: unknown src: $SRC"
         fi
 
     fi
