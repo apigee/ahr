@@ -61,6 +61,7 @@ function check_commands() {
 }
 
 function check_cqlsh() {
+    check_options "HYBRID_VERSION"
 
     if kubectl get pods -n apigee cqlsh &> /dev/null; then
         if [ "$(kubectl get pods -n apigee cqlsh -o jsonpath='{.status.phase}')" = 'Running' ]; then
@@ -71,7 +72,7 @@ function check_cqlsh() {
     fi
 
 # create cqlsh container
-cat <<'EOF' | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -81,7 +82,7 @@ metadata:
 spec:
   containers:
   - name: cqlsh
-    image: "gcr.io/apigee-release/hybrid/apigee-hybrid-cassandra-client:1.5.10"
+    image: "gcr.io/apigee-release/hybrid/apigee-hybrid-cassandra-client:$HYBRID_VERSION"
     imagePullPolicy: Always
     command:
     - sleep
@@ -110,6 +111,13 @@ spec:
 EOF
 
 kubectl wait --for=condition=ready -n apigee pod/cqlsh
+}
+
+function run_cqlsh() {
+
+    check_cqlsh
+    
+    kubectl -it exec -n apigee cqlsh -- bash -c "$CQLSH"
 }
 
 function exec_cqlsh() {
@@ -194,6 +202,13 @@ case "$1" in
 
     shift 2;;
 
+  # hybrid version for cassandra client
+  --hybrid-version)
+    HYBRID_VERSION="$2"
+
+    shift 2;;
+
+
   --version)
     version=true
     shift 1;;
@@ -237,14 +252,14 @@ if [ "$OBJECT" = "organizations" ]; then
 
         elif [ "$SRC" = "hybrid" ]; then
 
-            CQL="copy rtc_apigee_hybrid_org_hybrid.contract_ref(org,env) to stdout;"
+            CQL="copy rtc_${ORG//-/_}_hybrid.contract_ref(org,env) to stdout;"
 
             exec_cqlsh "$CQL"
         else
             echo "ERROR: organizations list: unknown src: $SRC"
         fi
     else
-        echo "ERROR: Unknown action: $ACTION"        
+        echo "ERROR: Unknown action: $ACTION"
     fi
 
 
@@ -325,7 +340,11 @@ elif [ "$OBJECT" = "keystores" ]; then
 elif [ "$OBJECT" = "cassandra" ]; then
         check_options "ORG SRC BACKUP_DIR"
 
-    if [ "$ACTION" = "backup" ]; then
+    if [ "$ACTION" = "cqlsh" ]; then
+    
+	run_cqlsh
+
+    elif [ "$ACTION" = "backup" ]; then
         if [ "$SRC" = "opdk" ]; then
 
             echo "TODO: [ ] "
