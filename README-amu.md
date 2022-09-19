@@ -5,16 +5,88 @@
 * also: Atomic Mass Unit, or Dalton https://en.wikipedia.org/wiki/Dalton_(unit).
 
 
+```diff
+- *BIG RED NOTICE:* Multiple pieces of data processed by this utility are
+- sensitive and are either encrypted data or encryption mateial. 
+- Be careful and conscious when and how you keep
+- and store the data.
+```
 
-BIG RED NOTICE: Multiple pieces of data processed by this utility are sensitive and encrypted. Be careful and conscious when and how you keep and store the data.
 The recommended way is to use 0600 directory.
 
-## AMU Commands and operation
+## AMU Commands and Options
 
 
-emigrate -- dumps of cassandra <tables???>
+### Options
 
-export -- process emigrated file and produce target formats
+To pass a required parameter value, you can mix-and-match two styles of options. Either provide an `--` option, with  dash-separated multiple words or define an environment variable with underscore-separated multiple words. 
+
+For example, those to fragments are equivalent:
+
+```sh
+# passing parameters implicitly
+
+export ORG=apigee-hybrid-org
+export SRC=hybrid
+export SRC_VAR 1.4
+    
+export EMIGRATE_DIR=~/amu/hybrid-org/hybrid-1.4
+export EXPORT_DIR=~/amu/hybrid-org/maven
+export 
+
+amu kvms export
+```
+
+```sh
+# passing parameters explicitely
+
+amu kvms export --org apigee-hybrid-org \
+    --src hybrid
+    --src-var 1.4
+    --tgt maven
+    --emigrate-dir=~/amu/hybrid-org/hybrid-1.4 \
+    --export_dir ~/amu/hybrid-org/maven
+```
+
+### AMU Commands
+
+```sh
+# for opdk
+amu organizations list --org $ORG --src $SRC --cass-ip $CASS_IP
+
+# for hybrid 
+amu organizations list --org $ORG --src $SRC
+
+# for opdk
+amu kek export --src $SRC --vault $VAULT --storepass $STOREPASS
+
+# for hybrid
+amu kek export --src $SRC --env $ENV
+
+# for opdk or hybrid
+amu kvms emigrate --org $ORG --src $SRC --emigrate-dir $EMIGRATE_DIR
+
+# for opdk
+amu kvms export --org $ORG --src $SRC --kek $KEK --emigrate-dir $EMIGRATE_DIR 
+
+for hybrid
+amu kvms export --org $ORG --src $SRC --dek $DEK --emigrate-dir $EMIGRATE_DIR --export-dir $EXPORT_DIR
+
+
+amu cassandra backup --org $ORG --src $SRC --backup-dir $BACKUP_DIR
+
+amu cassandra cqlsh --hybrid-version $HYBRID_VERSION
+```
+
+### Cassandra cqlsh command
+
+`amu` provides a convenience operation to start a cassandra client pod and log into its cqlsh utility. `amu' checks for status of the cassandra client pod and if it's not `RUNNING`, deletes the finished one and starts another instance for 3600 seconds.
+
+### Emigration and Export
+
+`amu` has an `emigrate` operation that takes the relevant contents of Cassandra Apigee tables and stores them in an $EMIGRATE_DIR directly
+
+The `export` operation processes files located in the $EMIGRATE_DIR directory and generates a target output, the file structures suitable for further importing by either apigee config maven plugin or apigeecli utility. As sackmesser is compatible with config maven input files, you can use sackmesser to import the data.
 
 
 ## AMU Install Setup and Execution

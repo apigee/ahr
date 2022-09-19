@@ -243,9 +243,11 @@ CQLSH='cqlsh apigee-cassandra-default.apigee.svc.cluster.local --ssl -u $APIGEE_
 if [ "$OBJECT" = "organizations" ]; then
     # amu org list
 
+    check_options "ORG"
+
     if [ "$ACTION" = "list" ]; then
         if [ "$SRC" = "opdk" ]; then
-            check_options "ORG CASS_IP"
+            check_options "CASS_IP"
             check_commands "$CQLSH"
 
             $CQLSH $CASS_IP -e "select key from kms.organizations;"
@@ -265,20 +267,23 @@ if [ "$OBJECT" = "organizations" ]; then
 
 elif [ "$OBJECT" = "kek" ]; then
 
+    check_options "SRC"
+
     if [ "$ACTION" = "export" ]; then
-        check_options "SRC"
 
         if [ "SRC" = "opdk" ]; then
             check_options "VAULT STOREPASS"
 
             KEK=$(cd $LIBDIR; java JKSExtractSKE $VAULT datastore-alias $STOREPASS $STOREPASS)
             echo "$KEK"
-        else 
+        elif [ "$SRC" = "hybrid" ]; then
             # hybrid
-            check_options "SRC ENV"
+            check_options "ENV"
 
             secret="$(ahr-runtime-ctl org-env-sha $ORG "$ENV")-encryption-keys"
             echo "$(kubectl -n apigee get secrets $secret --output 'jsonpath={.data.envKvmEncryptionKey}'|base64 -d|base64 -d |xxd -ps)"
+        else
+            echo "ERROR: kvms emigrate: unknown src: $SRC"
         fi
     fi
 
@@ -338,11 +343,12 @@ elif [ "$OBJECT" = "keystores" ]; then
 
 
 elif [ "$OBJECT" = "cassandra" ]; then
-        check_options "ORG SRC BACKUP_DIR"
+    
+    check_options "ORG SRC BACKUP_DIR"
 
     if [ "$ACTION" = "cqlsh" ]; then
     
-	run_cqlsh
+	    run_cqlsh
 
     elif [ "$ACTION" = "backup" ]; then
         if [ "$SRC" = "opdk" ]; then
