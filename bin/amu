@@ -267,11 +267,11 @@ if [ "$OBJECT" = "organizations" ]; then
 
 elif [ "$OBJECT" = "kek" ]; then
 
-    check_options "SRC"
+    check_options "$SRC"
 
     if [ "$ACTION" = "export" ]; then
 
-        if [ "SRC" = "opdk" ]; then
+        if [ "$SRC" = "opdk" ]; then
             check_options "VAULT STOREPASS"
 
             KEK=$(cd $LIBDIR; java JKSExtractSKE $VAULT datastore-alias $STOREPASS $STOREPASS)
