@@ -267,7 +267,7 @@ if [ "$OBJECT" = "organizations" ]; then
 
 elif [ "$OBJECT" = "kek" ]; then
 
-    check_options "$SRC"
+    check_options "SRC"
 
     if [ "$ACTION" = "export" ]; then
 
