@@ -96,13 +96,20 @@ print " folder: " folder
 
         dekhex = keystores[ scope "s@kvmaps:s@__ apigee__kvm__.keystore"  ]
         # process kvm entries
-
         encrypted = jqget( kvmaps[ scopename ], ".__apigee__encrypted"  )
-        
-        entries = jqget( kvmaps[ scopename ], "." kvm )
+
+        # expect top-level element key as an original [cased] name of the kvm 
+        # next to an optional encrypted flag
+        kvmname = jqkvmname( kvmaps[ scopename ] )
+
+        if( kvm == tolower( kvmname ) ){
+        # filter might be interpreted as an expression (use double quote to avoid):
+            entries = jqget( kvmaps[ scopename ], ".\"" kvmname "\"" )
+        }else{
+            entries = "AMU: [opdk driver] KVM INTEGRITY VIOLATION: JSON OBJECT KEY IS NOT FOUND!"
+        }
 
         if( encrypted == "null" ){
-
             json = json entries
         }else{
 
@@ -129,7 +136,7 @@ print " folder: " folder
 
         }
 
-        json = "[ { \"entry\": " json ", \"name\": \"" kvm "\" } ]"
+        json = "[ { \"entry\": " json ", \"name\": \"" kvmname "\" } ]"
 
 
         file = EXPORT_DIR folder "/kvms.json"

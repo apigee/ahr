@@ -15,6 +15,14 @@ function jqget( json, filter,     cmd, result ){
     return result
 }
 
+function jqkvmname( json,     cmd, result ){
+
+    cmd = "echo '" json "' | jq 'keys[]|select(.!=\"__apigee__encrypted\")' -r"
+    cmd | getline result
+    close(cmd)
+    return result
+}
+
 function aesdecrypt( datab64, keyhex,     cmd, result){
 
     cmd = "bash -c 'echo -n " datab64 "| openssl enc -aes-128-ecb -d -K " keyhex " -base64 -A'"
