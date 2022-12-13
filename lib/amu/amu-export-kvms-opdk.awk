@@ -1,12 +1,12 @@
 #!/usr/bin/env awk
 
-@include "awk-lib.awk"
+@include "amu-lib.awk"
 
 BEGIN{
 
     # stderr: cassandra-cli output for an org
     # expected variables:
-    # KER EXPORT_DIR
+    # KEK EXPORT_DIR
 
 
 # scopes:

@@ -299,7 +299,8 @@ elif [ "$OBJECT" = "kvms" ]; then
         # at a cassandra node's VM:
 
         if [ "$SRC" = "opdk" ]; then
-            check_commands "$CASS_CLI  CASS_IP"
+            check_options "CASS_IP"
+            check_commands "$CASS_CLI"
 
             echo -e "use keyvaluemap;\nget keyvaluemaps_r21[org];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
         elif [ "$SRC" = "hybrid" ]; then
@@ -322,7 +323,7 @@ elif [ "$OBJECT" = "kvms" ]; then
 
             # amu kvm emigrate --cass-ip=10.128.0.22 --org=org --kek=9944 --emigrate-dir=. --apigee-product=opdk [hybrid] --apigee-version=4.51 [or 4.50 or 1.7]
         
-            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v export_dir=$EXPORT_DIR -v TGT=$TGT -v KEK=$KEK $EMIGRATE_DIR/$ORG-kvms.out
+            export AWKPATH=$LIBDIR; awk -f amu-export-kvms-$SRC.awk -v EXPORT_DIR=$EXPORT_DIR -v TGT=$TGT -v KEK=$KEK $EMIGRATE_DIR/$ORG-kvms.out
         elif [ "$SRC" = "hybrid" ]; then
             # hybrid
             check_options "DEK"
