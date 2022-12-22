@@ -302,7 +302,7 @@ elif [ "$OBJECT" = "kvms" ]; then
             check_options "CASS_IP"
             check_commands "$CASS_CLI"
 
-            echo -e "use keyvaluemap;\nget keyvaluemaps_r21[org];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
+            echo -e "use keyvaluemap;\nget keyvaluemaps_r21[${ORG}];" | $CASS_CLI -h $CASS_IP > $EMIGRATE_DIR/$ORG-kvms.out
         elif [ "$SRC" = "hybrid" ]; then
             # hybrid
             check_commands "kubectl"
