@@ -1,0 +1,3 @@
+# Ignore reason: These artifacts are used for in-place utility invocations
+ignorePaths:
+- lib/amu/JKSExtractSKE.class
