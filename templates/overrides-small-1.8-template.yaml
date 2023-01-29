@@ -31,8 +31,20 @@ instanceID: "$CLUSTER-$REGION"
 
 virtualhosts:
   - name: $ENV_GROUP
+    selector:
+      app: apigee-ingressgateway
+      ingress_name: my-ingress
     sslCertPath: $RUNTIME_SSL_CERT
     sslKeyPath: $RUNTIME_SSL_KEY
+
+ao:
+  args:
+    disableIstioConfigInAPIServer: true
+
+ingressGateways:
+- name: my-ingress
+  replicaCountMin: 2
+  replicaCountMax: 10
 
 envs:
   - name: $ENV
